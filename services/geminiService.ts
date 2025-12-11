@@ -22,26 +22,16 @@ export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, 
 export const cleanMarkdownForSpeech = (markdown: string): string => {
     if (!markdown) return "";
     return markdown
-        // 1. Remove linhas de separação de tabela (ex: |---|---|)
         .replace(/^\|?[\s\-|:]+\|$/gm, '') 
-        // 2. Substitui pipes de tabela por vírgulas (pausa natural)
         .replace(/\|/g, ', ')
-        // 3. Remove marcadores de Negrito/Itálico (**texto** -> texto)
         .replace(/\*\*|__/g, '')
-        // 4. Remove Hash de Títulos (## Título -> Título)
         .replace(/^#+\s/gm, '')
-        // 5. Remove Blockquotes (> Texto -> Texto)
         .replace(/^>\s/gm, '')
-        // 6. Remove Blocos de Código e Inline Code
         .replace(/```[\s\S]*?```/g, '')
         .replace(/`/g, '')
-        // 7. Remove Imagens, mantendo texto alt se houver
         .replace(/!\[(.*?)\]\(.*?\)/g, '$1')
-        // 8. Remove Links, mantendo apenas o texto
         .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-        // 9. Remove linhas horizontais
         .replace(/^-{3,}$/gm, '')
-        // 10. Normaliza quebras de linha excessivas
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 };
@@ -85,31 +75,6 @@ export const splitTextSmartly = (text: string, limit: number = 3500): string[] =
 // ---------------------------------------------------------------------------
 // SERVICES
 // ---------------------------------------------------------------------------
-
-const buildPrompt = (chapterTitle: string, subchapterTitle: string, description: string, subchapterId: string, lang: Language) => {
-    const references = BIBLIOGRAPHY[subchapterId];
-    const bibliographyInstruction = references 
-        ? `\n\n**BASE CIENTÍFICA E BIBLIOGRÁFICA OBRIGATÓRIA:**\nVocê DEVE fundamentar seus argumentos nas seguintes obras:\n${references.map(r => `- ${r}`).join('\n')}\n`
-        : "";
-
-    return `
-    ${getCorePersonaInstruction(lang)}
-
-    TAREFA ATUAL:
-    Como Milton Dilts e Roberta Erickson, escreva o conteúdo completo para:
-    
-    Capítulo: ${chapterTitle}
-    Subcapítulo: ${subchapterTitle}
-    Contexto/Descrição: ${description}
-    ${bibliographyInstruction}
-
-    DIRETRIZES:
-    1. **Idioma:** ${lang.toUpperCase()}.
-    2. **Explicação:** Lembre-se de contextualizar termos como Kyoshu-Sama/Meishu-Sama para o público geral.
-    3. **Estilo:** Hipnótico, Científico e Espiritual.
-    4. **Formato:** Texto de livro final.
-`;
-};
 
 export const generatePodcastScript = async (
   chapterTitle: string,
@@ -254,9 +219,11 @@ export const generatePodcastScript = async (
 
                 if (!speakerClean) speakerClean = "Milton Dilts";
 
-                let voiceId = "Fenrir"; 
+                // DEFAULT: Milton = Enceladus (User preference)
+                let voiceId = "Enceladus"; 
                 const lowerSpeaker = speakerRaw.toLowerCase();
                 
+                // ROBERTA = Aoede
                 if (lowerSpeaker.includes('roberta')) {
                     voiceId = 'Aoede';
                     if (speakerClean === "Milton Dilts") speakerClean = "Roberta Erickson";
@@ -286,17 +253,27 @@ export const generateSpeech = async (text: string, voiceIdOrName: string, retrie
   
   const safeText = (text || "").slice(0, 4500); 
 
-  let apiVoiceName = 'Aoede'; 
+  let apiVoiceName = 'Enceladus'; // Default for Milton
   const input = voiceIdOrName ? voiceIdOrName.toLowerCase() : '';
 
-  if (input.includes('roberta') || input.includes('aoede') || input.includes('erickson')) {
-      apiVoiceName = 'Aoede';
-  } else {
-      apiVoiceName = 'Fenrir'; 
-  }
-
-  if (input.includes('milton') || input.includes('dilts') || input.includes('enceladus')) {
-      apiVoiceName = 'Fenrir';
+  // 1. Direct API Name Match (Priority) - INCLUDING Enceladus
+  if (['puck', 'charon', 'kore', 'fenrir', 'aoede', 'zephyr', 'enceladus'].includes(input)) {
+      apiVoiceName = input.charAt(0).toUpperCase() + input.slice(1);
+  } 
+  // 2. Persona Mapping (Fallback)
+  else {
+      // Roberta Erickson -> Aoede
+      if (input.includes('roberta') || input.includes('aoede') || input.includes('erickson')) {
+          apiVoiceName = 'Aoede';
+      }
+      // Milton Dilts -> Enceladus (User Specific)
+      else if (input.includes('milton') || input.includes('dilts') || input.includes('enceladus')) {
+          apiVoiceName = 'Enceladus';
+      }
+      // General Male -> Enceladus (Safe default for this app)
+      else {
+          apiVoiceName = 'Enceladus'; 
+      }
   }
 
   for (let attempt = 0; attempt < retries; attempt++) {

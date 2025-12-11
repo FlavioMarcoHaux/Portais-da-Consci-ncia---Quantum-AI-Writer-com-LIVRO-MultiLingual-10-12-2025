@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Chapter, Subchapter, GenerationStatus, WriterData, Language } from '../types';
 import { BookOpen, Mic, Download, FileText, Play, Pause, Sparkles, GraduationCap } from 'lucide-react';
@@ -37,12 +38,13 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             
             for (let i = 0; i < chunks.length; i++) {
                 const pct = Math.round(((i) / chunks.length) * 100);
-                setProgressMsg(`Renderizando Voz Quântica: ${pct}%`);
+                setProgressMsg(`Renderizando Voz Quântica (Enceladus): ${pct}%`);
                 
                 if (i > 0) await delay(1000); 
 
                 try {
-                    const base64 = await generateSpeech(chunks[i], 'Fenrir');
+                    // EXPLICIT: Use Enceladus for Milton Dilts (Breathy, lower pitch)
+                    const base64 = await generateSpeech(chunks[i], 'Enceladus');
                     if (base64) {
                         const bytes = base64ToUint8Array(base64);
                         audioBlobs.push(new Blob([bytes]));
@@ -207,8 +209,8 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                 <div className="text-indigo-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                     <BookOpen size={14} /> Manuscrito
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={handleDownloadPDF} className="p-2 text-neutral-400 hover:text-white border border-neutral-700 rounded-lg hover:bg-neutral-800" title="Baixar PDF">
+                <div className="flex gap-2 items-center">
+                    <button onClick={handleDownloadPDF} className="p-2 text-neutral-400 hover:text-white border border-neutral-700 rounded-lg hover:bg-neutral-800 flex items-center gap-1" title="Baixar PDF">
                         <FileText size={18} />
                     </button>
                     
@@ -216,17 +218,17 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                         <a 
                             href={data.book.audiobookUrl} 
                             download={`audiobook_${subchapter?.id || 'chapter'}.wav`}
-                            className="p-2 text-neutral-400 hover:text-green-400 border border-neutral-700 rounded-lg hover:bg-neutral-800 transition-colors flex items-center justify-center"
+                            className="p-2 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 bg-emerald-950/30 rounded-lg hover:bg-emerald-900/50 transition-colors flex items-center gap-1 font-bold text-xs"
                             title="Baixar Audiobook (.wav)"
                         >
-                            <Download size={18} />
+                            <Download size={18} /> <span>WAV</span>
                         </a>
                     )}
 
                     <button 
                         onClick={handleCreateAudiobook} 
                         disabled={isBusy || !!data.book?.audiobookUrl}
-                        className={`p-2 border rounded-lg ${data.book?.audiobookUrl ? 'text-green-400 border-green-900 bg-green-900/10 cursor-default' : 'text-neutral-400 hover:text-indigo-400 border-neutral-700 hover:bg-neutral-800'}`}
+                        className={`p-2 border rounded-lg transition-all ${data.book?.audiobookUrl ? 'text-green-400 border-green-900 bg-green-900/10 cursor-default opacity-50' : 'text-neutral-400 hover:text-indigo-400 border-neutral-700 hover:bg-neutral-800'}`}
                         title="Gerar Audiobook"
                     >
                         <Mic size={18} />
@@ -250,7 +252,6 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                                 <p className="text-white text-xs">Capítulo Completo</p>
                             </div>
                         </div>
-                        {/* Download button moved to Header */}
                     </div>
                 </div>
             )}

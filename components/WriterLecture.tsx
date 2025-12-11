@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Subchapter, GenerationStatus, WriterData, Language } from '../types';
 import { GraduationCap, Mic, Download, Play, Pause, FileText, Quote, List, BrainCircuit } from 'lucide-react';
@@ -37,11 +38,12 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
             
             for (let i = 0; i < chunks.length; i++) {
                 const pct = Math.round(((i) / chunks.length) * 100);
-                setProgressMsg(`Renderizando Voz da Professora: ${pct}%`);
+                setProgressMsg(`Renderizando Voz da Professora (Roberta): ${pct}%`);
                 
                 if (i > 0) await delay(1000); 
 
                 try {
+                    // EXPLICIT: Use Aoede for Roberta Erickson
                     const base64 = await generateSpeech(chunks[i], 'Aoede');
                     if (base64) {
                         const bytes = base64ToUint8Array(base64);
@@ -56,7 +58,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
             const wavBlob = createWavBlob(audioBlobs);
             if (wavBlob) {
                 const url = window.URL.createObjectURL(wavBlob);
-                // Critical update to ensure UI re-renders with the URL
+                // Critical update to ensure UI re-renders with the URL without overwriting script
                 onUpdate({ 
                     statusAudioLecture: GenerationStatus.COMPLETE,
                     lecture: { ...data.lecture, audioUrl: url }
@@ -209,17 +211,17 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                         <a 
                             href={data.lecture.audioUrl} 
                             download={`aula_${subchapter?.id || 'gen'}.wav`}
-                            className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-neutral-300 hover:text-emerald-400 border border-neutral-700 hover:border-emerald-500 rounded-lg transition-all text-sm font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-950/30 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 hover:border-emerald-500 hover:bg-emerald-900/50 rounded-lg transition-all text-sm font-medium"
                             title="Baixar Aula (.wav)"
                         >
-                            <Download size={16} /> <span>Audio</span>
+                            <Download size={16} /> <span>WAV</span>
                         </a>
                     )}
 
                     <button 
                         onClick={handleCreateAudioLecture}
                         disabled={isBusy || !!data.lecture?.audioUrl}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${data.lecture?.audioUrl ? 'text-emerald-400 border-emerald-900 bg-emerald-900/20 cursor-default' : 'bg-neutral-900 text-neutral-300 hover:text-white border-neutral-700 hover:border-emerald-500 hover:text-emerald-400'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${data.lecture?.audioUrl ? 'text-emerald-400 border-emerald-900 bg-emerald-900/20 cursor-default opacity-50' : 'bg-neutral-900 text-neutral-300 hover:text-white border-neutral-700 hover:border-emerald-500 hover:text-emerald-400'}`}
                     >
                         <Mic size={16} />
                         {data.lecture?.audioUrl ? 'Áudio Gerado' : 'Gerar Áudio'}
@@ -227,7 +229,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                 </div>
             </div>
 
-            {/* AUDIO PLAYER (FIXED DOWNLOAD MOVED TO HEADER) */}
+            {/* AUDIO PLAYER */}
             {data.lecture?.audioUrl && (
                  <div className="max-w-4xl mx-auto mt-6 px-4">
                     <div className="bg-emerald-950/20 border border-emerald-500/20 p-6 rounded-xl flex items-center justify-between shadow-lg">
