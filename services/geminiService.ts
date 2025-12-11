@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { getCorePersonaInstruction, getPodcastSystemInstruction, getSeoAgentInstruction, getThumbnailAgentInstruction } from '../constants';
 import { BIBLIOGRAPHY } from '../bibliography';
@@ -20,6 +19,33 @@ const BASE_CONFIG = {
 
 export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+export const cleanMarkdownForSpeech = (markdown: string): string => {
+    if (!markdown) return "";
+    return markdown
+        // 1. Remove linhas de separação de tabela (ex: |---|---|)
+        .replace(/^\|?[\s\-|:]+\|$/gm, '') 
+        // 2. Substitui pipes de tabela por vírgulas (pausa natural)
+        .replace(/\|/g, ', ')
+        // 3. Remove marcadores de Negrito/Itálico (**texto** -> texto)
+        .replace(/\*\*|__/g, '')
+        // 4. Remove Hash de Títulos (## Título -> Título)
+        .replace(/^#+\s/gm, '')
+        // 5. Remove Blockquotes (> Texto -> Texto)
+        .replace(/^>\s/gm, '')
+        // 6. Remove Blocos de Código e Inline Code
+        .replace(/```[\s\S]*?```/g, '')
+        .replace(/`/g, '')
+        // 7. Remove Imagens, mantendo texto alt se houver
+        .replace(/!\[(.*?)\]\(.*?\)/g, '$1')
+        // 8. Remove Links, mantendo apenas o texto
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+        // 9. Remove linhas horizontais
+        .replace(/^-{3,}$/gm, '')
+        // 10. Normaliza quebras de linha excessivas
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+};
+
 export const splitTextSmartly = (text: string, limit: number = 3500): string[] => {
     if (!text) return [];
     if (text.length <= limit) return [text];
@@ -27,26 +53,20 @@ export const splitTextSmartly = (text: string, limit: number = 3500): string[] =
     const chunks: string[] = [];
     let currentChunk = "";
     
-    // Regex split: Mantém os delimitadores (. ! ?) junto com a frase.
-    // Procura por pontuação final seguida de espaço ou fim da string.
-    // Isso evita cortes no meio de palavras.
     const sentences = text.match(/[^.!?]+([.!?]+|$)/g) || [text];
 
     for (const sentence of sentences) {
-        // Se a frase sozinha for maior que o limite (caso raro de texto sem pontuação), corta na força bruta
         if (sentence.length > limit) {
              if (currentChunk) {
                  chunks.push(currentChunk.trim());
                  currentChunk = "";
              }
-             // Divide a frase gigante em blocos hard-coded
              let remaining = sentence;
              while (remaining.length > 0) {
                  chunks.push(remaining.slice(0, limit));
                  remaining = remaining.slice(limit);
              }
         } 
-        // Lógica padrão de acumulação
         else if ((currentChunk.length + sentence.length) > limit) {
             chunks.push(currentChunk.trim());
             currentChunk = sentence;
@@ -122,8 +142,6 @@ export const generatePodcastScript = async (
         topicInstruction = "Siga estritamente o tema do Subcapítulo fornecido.";
     }
 
-    // AJUSTE DE ENGENHARIA DE TEMPO:
-    // Dividimos em blocos de 5 minutos para manter a qualidade do contexto
     const CHUNK_DURATION = 5; 
     const totalChunks = Math.ceil(durationMinutes / CHUNK_DURATION);
     
@@ -140,9 +158,7 @@ export const generatePodcastScript = async (
             if (remainder > 0) minutesForThisChunk = remainder;
         }
 
-        // Estimativa de palavras (130 palavras por minuto para um ritmo de fala natural)
         const targetWordCount = Math.ceil(minutesForThisChunk * 130);
-
         const isFinalChunk = currentChunk === totalChunks;
 
         const partInstruction = totalChunks > 1 
@@ -226,7 +242,6 @@ export const generatePodcastScript = async (
             const segments: PodcastSegment[] = segmentsArray.map(item => {
                 let speakerRaw = item.speaker || "Milton Dilts";
                 
-                // SANITIZATION FILTER
                 let speakerClean = speakerRaw
                     .replace(/\(Voz de .+\)/gi, '')
                     .replace(/Voz de .+/gi, '')
@@ -239,8 +254,7 @@ export const generatePodcastScript = async (
 
                 if (!speakerClean) speakerClean = "Milton Dilts";
 
-                // Voice Logic Mapping
-                let voiceId = "Enceladus";
+                let voiceId = "Fenrir"; 
                 const lowerSpeaker = speakerRaw.toLowerCase();
                 
                 if (lowerSpeaker.includes('roberta')) {
@@ -270,7 +284,6 @@ export const generatePodcastScript = async (
 export const generateSpeech = async (text: string, voiceIdOrName: string, retries = 3): Promise<string | null> => {
   if (!apiKey) throw new Error("API Key not found.");
   
-  // Hard slice apenas para segurança final (4500), mas o 'splitTextSmartly' deve ser usado antes
   const safeText = (text || "").slice(0, 4500); 
 
   let apiVoiceName = 'Aoede'; 
@@ -279,14 +292,13 @@ export const generateSpeech = async (text: string, voiceIdOrName: string, retrie
   if (input.includes('roberta') || input.includes('aoede') || input.includes('erickson')) {
       apiVoiceName = 'Aoede';
   } else {
-      apiVoiceName = 'Enceladus'; 
+      apiVoiceName = 'Fenrir'; 
   }
 
   if (input.includes('milton') || input.includes('dilts') || input.includes('enceladus')) {
-      apiVoiceName = 'Enceladus';
+      apiVoiceName = 'Fenrir';
   }
 
-  // Mecanismo de Retry com Exponential Backoff para lidar com Rate Limiting (Erro 429)
   for (let attempt = 0; attempt < retries; attempt++) {
       try {
         const response = await ai.models.generateContent({
@@ -307,16 +319,16 @@ export const generateSpeech = async (text: string, voiceIdOrName: string, retrie
 
       } catch (error: any) {
         const isRateLimit = error.message?.includes('429') || error.status === 429 || error.status === 503;
+        const isInternalError = error.message?.includes('500') || error.status === 500;
         
-        if (isRateLimit && attempt < retries - 1) {
-            const waitTime = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s...
-            console.warn(`Rate limit TTS hit. Retrying in ${waitTime}ms... (Attempt ${attempt + 1}/${retries})`);
+        if ((isRateLimit || isInternalError) && attempt < retries - 1) {
+            const waitTime = 2000 * Math.pow(2, attempt); 
+            console.warn(`TTS Error (${error.status || error.code || 'unknown'}). Retrying in ${waitTime}ms... (Attempt ${attempt + 1}/${retries})`);
             await delay(waitTime);
             continue;
         }
 
         console.error("Error generating speech:", error);
-        // Se falhar na última tentativa, retorna null
         return null;
       }
   }
