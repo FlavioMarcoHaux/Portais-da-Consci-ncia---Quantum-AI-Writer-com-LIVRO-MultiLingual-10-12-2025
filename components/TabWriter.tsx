@@ -199,39 +199,126 @@ export const TabWriter: React.FC<TabWriterProps> = ({
     const handleDownloadPDF = (type: 'book' | 'lecture') => {
         const content = type === 'book' ? data.book?.fullText : data.lecture?.script;
         const title = type === 'book' ? subchapter?.title : `Aula Magna: ${subchapter?.title}`;
+        
         if (!content) return;
 
         const doc = new jsPDF();
         
-        // Header
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 20;
+        const maxLineWidth = pageWidth - (margin * 2);
+        
+        let y = margin;
+
+        // --- TITLE ---
         doc.setFont("times", "bold");
-        doc.setFontSize(22);
-        const splitTitle = doc.splitTextToSize(title || "Documento", 180);
-        doc.text(splitTitle, 15, 20);
+        doc.setFontSize(type === 'book' ? 22 : 18);
+        doc.setTextColor(type === 'lecture' ? 10 : 0, type === 'lecture' ? 80 : 0, type === 'lecture' ? 60 : 0); // Emerald tone for Lecture
+        
+        const splitTitle = doc.splitTextToSize(title || "Documento", maxLineWidth);
+        doc.text(splitTitle, margin, y);
+        y += (splitTitle.length * 8) + 5;
 
-        // Subheader
-        doc.setFontSize(12);
-        doc.setTextColor(100);
-        doc.text("Portais da Consciência - AI Generated Material", 15, 30 + (splitTitle.length * 5));
-
-        // Content
+        // --- SUBTITLE ---
         doc.setFont("times", "normal");
-        doc.setTextColor(0);
-        doc.setFontSize(11);
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(type === 'book' ? "Manuscrito Original - Portais da Consciência" : "Guia de Estudos & Práticas - Prof. Roberta Erickson", margin, y);
+        y += 10;
+
+        // --- SEPARATOR ---
+        doc.setDrawColor(200);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+
+        // --- CONTENT PARSING ---
+        // Simple Markdown Parser for PDF
+        const lines = content.split('\n');
         
-        const lines = doc.splitTextToSize(content.replace(/\*\*/g, ''), 180);
-        let y = 45 + (splitTitle.length * 5);
-        
-        lines.forEach((line: string) => {
-            if (y > 280) {
+        lines.forEach((line) => {
+            // Check Page Overflow
+            if (y > pageHeight - margin) {
                 doc.addPage();
-                y = 20;
+                y = margin;
             }
-            doc.text(line, 15, y);
-            y += 6;
+
+            let text = line.trim();
+            if (!text) {
+                y += 5; // Paragraph spacing
+                return;
+            }
+
+            // Styles
+            let fontSize = 11;
+            let fontStyle = "normal"; // normal, bold, italic, bolditalic
+            let color = [0, 0, 0];
+            let indent = 0;
+            let spacingAfter = 5;
+
+            // Headers
+            if (text.startsWith('## ')) {
+                fontSize = 14;
+                fontStyle = "bold";
+                color = type === 'lecture' ? [0, 100, 80] : [40, 40, 40];
+                text = text.replace(/^##\s+/, '');
+                y += 5; // Extra space before header
+            } 
+            else if (text.startsWith('### ')) {
+                fontSize = 12;
+                fontStyle = "bold";
+                color = [60, 60, 60];
+                text = text.replace(/^###\s+/, '');
+                y += 3;
+            }
+            // Lists
+            else if (text.startsWith('- ') || text.startsWith('* ')) {
+                text = '• ' + text.replace(/^[-*]\s+/, '');
+                indent = 5;
+                spacingAfter = 4;
+            }
+            // Blockquotes
+            else if (text.startsWith('> ')) {
+                text = text.replace(/^>\s+/, '');
+                fontStyle = "italic";
+                color = [80, 80, 80];
+                indent = 10;
+            }
+
+            // Clean inline markdown
+            text = text.replace(/\*\*/g, ''); // Remove bold markers
+            text = text.replace(/__/g, ''); // Remove italic markers
+
+            // Render
+            doc.setFont("times", fontStyle);
+            doc.setFontSize(fontSize);
+            doc.setTextColor(color[0], color[1], color[2]);
+
+            const wrappedText = doc.splitTextToSize(text, maxLineWidth - indent);
+            doc.text(wrappedText, margin + indent, y);
+            
+            y += (wrappedText.length * (fontSize * 0.5)) + (spacingAfter / 2);
         });
 
-        doc.save(`${type}_${subchapter?.id}_${language}.pdf`);
+        // --- FOOTER ---
+        const pageCount = doc.getNumberOfPages();
+        for(let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFont("times", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            
+            const footerText = `Página ${i} de ${pageCount}`;
+            doc.text(footerText, pageWidth - margin - 20, pageHeight - 10);
+
+            if (type === 'lecture') {
+                 doc.text("Guia de Estudos - Fé em 10 Minutos de Oração - youtube.com/@fe10minutos", margin, pageHeight - 10);
+            } else {
+                 doc.text("Portais da Consciência - Fé em 10 Minutos de Oração - youtube.com/@fe10minutos", margin, pageHeight - 10);
+            }
+        }
+
+        doc.save(`${type === 'book' ? 'Livro' : 'Aula'}_${subchapter?.id || 'doc'}.pdf`);
     };
 
     // --- RENDER ---
@@ -377,7 +464,11 @@ export const TabWriter: React.FC<TabWriterProps> = ({
                                                 p: ({node, ...props}) => <p className="mb-6 indent-8" {...props} />, // Indent first line for book feel
                                                 strong: ({node, ...props}) => <strong className="text-white font-bold" {...props} />,
                                                 ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-6 space-y-2 text-neutral-400" {...props} />,
-                                                blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-indigo-900/50 pl-6 italic text-neutral-400 my-8 py-2 bg-neutral-900/30 rounded-r" {...props} />
+                                                blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-indigo-900/50 pl-6 italic text-neutral-400 my-8 py-2 bg-neutral-900/30 rounded-r" {...props} />,
+                                                // Adicionando suporte básico a tabelas também no Livro (Dark Mode)
+                                                table: ({node, ...props}) => <div className="overflow-x-auto my-8"><table className="w-full text-left border-collapse border border-neutral-700" {...props} /></div>,
+                                                th: ({node, ...props}) => <th className="p-4 border-b border-neutral-700 bg-neutral-900 text-indigo-300 font-serif" {...props} />,
+                                                td: ({node, ...props}) => <td className="p-4 border-b border-neutral-800 text-neutral-400" {...props} />,
                                             }}
                                         >
                                             {data.book?.fullText || ""}
@@ -507,7 +598,18 @@ export const TabWriter: React.FC<TabWriterProps> = ({
                                                             <blockquote className="text-emerald-900 italic font-medium" {...props} />
                                                         </div>
                                                     ),
-                                                    strong: ({node, ...props}) => <strong className="text-emerald-900 font-bold" {...props} />
+                                                    strong: ({node, ...props}) => <strong className="text-emerald-900 font-bold" {...props} />,
+                                                    // TABLE SUPPORT - AULA MAGNA
+                                                    table: ({node, ...props}) => (
+                                                        <div className="overflow-x-auto my-8 rounded-lg shadow-sm border border-neutral-300 bg-white">
+                                                            <table className="w-full text-left border-collapse" {...props} />
+                                                        </div>
+                                                    ),
+                                                    thead: ({node, ...props}) => <thead className="bg-emerald-100 border-b border-emerald-200" {...props} />,
+                                                    tbody: ({node, ...props}) => <tbody className="divide-y divide-neutral-200" {...props} />,
+                                                    tr: ({node, ...props}) => <tr className="hover:bg-neutral-50 transition-colors" {...props} />,
+                                                    th: ({node, ...props}) => <th className="px-6 py-4 font-bold text-emerald-900 text-sm uppercase tracking-wider" {...props} />,
+                                                    td: ({node, ...props}) => <td className="px-6 py-4 text-neutral-700 whitespace-pre-line leading-relaxed" {...props} />,
                                                 }}
                                             >
                                                 {data.lecture.script}
