@@ -103,42 +103,64 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 20;
+        const bottomMargin = 35; // Increased buffer
         const maxLineWidth = pageWidth - (margin * 2);
-        let y = margin;
+        let y = margin + 10;
 
         doc.setFont("times", "bold");
-        doc.setFontSize(18);
+        doc.setFontSize(22); // Increased title
         doc.setTextColor(10, 80, 60);
         doc.text(`Aula Magna: ${subchapter.title}`, margin, y);
         y += 15;
 
         doc.setFont("times", "normal");
-        doc.setFontSize(10);
+        doc.setFontSize(12);
         doc.setTextColor(100);
         doc.text("Guia de Estudos & Práticas - Prof. Roberta Erickson", margin, y);
         y += 10;
         doc.setDrawColor(200);
         doc.line(margin, y, pageWidth - margin, y);
-        y += 10;
+        y += 15;
 
         const lines = content.split('\n');
+        
         lines.forEach((line) => {
-            if (y > pageHeight - margin) { doc.addPage(); y = margin; }
-            let text = line.trim();
-            if (!text) { y += 5; return; }
+            // Check for bottom margin collision
+            if (y > pageHeight - bottomMargin) { 
+                doc.addPage(); 
+                y = margin + 10; 
+            }
 
-            let fontSize = 11;
+            let text = line.trim();
+            if (!text) { 
+                y += 6; 
+                return; 
+            }
+
+            let fontSize = 12; // Increased base font
             let fontStyle = "normal";
             let color = [0, 0, 0];
+            let lineHeightFactor = 6;
 
             if (text.startsWith('## ')) {
-                fontSize = 14; fontStyle = "bold"; color = [0, 100, 80]; text = text.replace(/^##\s+/, ''); y += 5;
+                fontSize = 16; 
+                fontStyle = "bold"; 
+                color = [0, 100, 80]; 
+                text = text.replace(/^##\s+/, ''); 
+                y += 8;
+                lineHeightFactor = 8;
             } else if (text.startsWith('### ')) {
-                fontSize = 12; fontStyle = "bold"; text = text.replace(/^###\s+/, ''); y += 3;
+                fontSize = 14; 
+                fontStyle = "bold"; 
+                text = text.replace(/^###\s+/, ''); 
+                y += 6;
+                lineHeightFactor = 7;
             } else if (text.startsWith('- ') || text.startsWith('* ')) {
-                text = '• ' + text.replace(/^[-*]\s+/, '');
+                text = '•  ' + text.replace(/^[-*]\s+/, '');
             } else if (text.startsWith('> ')) {
-                text = text.replace(/^>\s+/, ''); fontStyle = "italic"; color = [80, 80, 80];
+                text = text.replace(/^>\s+/, ''); 
+                fontStyle = "italic"; 
+                color = [80, 80, 80];
             }
 
             text = text.replace(/\*\*/g, '').replace(/__/g, '');
@@ -148,15 +170,20 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
 
             const wrappedText = doc.splitTextToSize(text, maxLineWidth);
             doc.text(wrappedText, margin, y);
-            y += (wrappedText.length * (fontSize * 0.5)) + 3;
+            
+            y += (wrappedText.length * lineHeightFactor) + 2;
         });
 
         // Footer
         const pageCount = doc.getNumberOfPages();
         for(let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
-            doc.setFontSize(8);
+            doc.setFontSize(9);
             doc.setTextColor(150);
+            
+            doc.setDrawColor(220);
+            doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+
             doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
             doc.text("Guia de Estudos - Fé em 10 Minutos de Oração - youtube.com/@fe10minutos", margin, pageHeight - 10);
         }

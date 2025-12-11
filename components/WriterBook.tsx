@@ -77,68 +77,104 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         if (!content || !subchapter) return;
 
         const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
+        const pageWidth = doc.internal.pageSize.getWidth(); // ~210mm (A4)
+        const pageHeight = doc.internal.pageSize.getHeight(); // ~297mm (A4)
         const margin = 20;
+        const bottomMargin = 35; // Increased buffer for footer
         const maxLineWidth = pageWidth - (margin * 2);
         
-        let y = margin;
+        let y = margin + 10;
 
-        // Title
+        // --- Cover / Header ---
         doc.setFont("times", "bold");
-        doc.setFontSize(22);
+        doc.setFontSize(24); // Larger Title
         doc.setTextColor(0, 0, 0);
+        
         const splitTitle = doc.splitTextToSize(subchapter.title, maxLineWidth);
         doc.text(splitTitle, margin, y);
-        y += (splitTitle.length * 8) + 5;
+        y += (splitTitle.length * 10) + 5;
 
-        // Subtitle
         doc.setFont("times", "normal");
-        doc.setFontSize(10);
-        doc.setTextColor(100);
+        doc.setFontSize(12);
+        doc.setTextColor(80);
         doc.text("Manuscrito Original - Portais da Consciência", margin, y);
         y += 10;
+        
         doc.setDrawColor(200);
+        doc.setLineWidth(0.5);
         doc.line(margin, y, pageWidth - margin, y);
-        y += 10;
+        y += 15;
 
+        // --- Content ---
         const lines = content.split('\n');
+        
         lines.forEach((line) => {
-            if (y > pageHeight - margin) {
+            // Check for new page BEFORE writing
+            // pageHeight - bottomMargin ensures text doesn't hit the footer area
+            if (y > pageHeight - bottomMargin) {
                 doc.addPage();
-                y = margin;
+                y = margin + 10; // Reset Y for new page
             }
-            let text = line.trim();
-            if (!text) { y += 5; return; }
 
-            let fontSize = 11;
+            let text = line.trim();
+            if (!text) { 
+                y += 6; // Space for empty lines
+                return; 
+            }
+
+            let fontSize = 12; // Base font increased to 12
             let fontStyle = "normal";
             let color = [0, 0, 0];
+            let lineHeightFactor = 6; // Approx 1.5 spacing for size 12
             
+            // Markdown Parsing
             if (text.startsWith('## ')) {
-                fontSize = 14; fontStyle = "bold"; text = text.replace(/^##\s+/, ''); y += 5;
+                fontSize = 16; 
+                fontStyle = "bold"; 
+                text = text.replace(/^##\s+/, ''); 
+                y += 8; // Extra space before header
+                lineHeightFactor = 8;
             } else if (text.startsWith('### ')) {
-                fontSize = 12; fontStyle = "bold"; text = text.replace(/^###\s+/, ''); y += 3;
+                fontSize = 14; 
+                fontStyle = "bold"; 
+                text = text.replace(/^###\s+/, ''); 
+                y += 6;
+                lineHeightFactor = 7;
             } else if (text.startsWith('- ')) {
-                text = '• ' + text.replace(/^-\s+/, '');
+                text = '•  ' + text.replace(/^-\s+/, '');
+            } else if (text.startsWith('> ')) {
+                text = text.replace(/^>\s+/, '');
+                fontStyle = 'italic';
+                color = [60, 60, 60];
             }
 
+            // Cleanup
             text = text.replace(/\*\*/g, '').replace(/__/g, '');
+            
             doc.setFont("times", fontStyle);
             doc.setFontSize(fontSize);
             doc.setTextColor(color[0], color[1], color[2]);
 
             const wrappedText = doc.splitTextToSize(text, maxLineWidth);
             doc.text(wrappedText, margin, y);
-            y += (wrappedText.length * (fontSize * 0.5)) + 3;
+            
+            // Increment Y based on number of wrapped lines
+            y += (wrappedText.length * lineHeightFactor) + 2; 
         });
 
-        // Footer
+        // --- Footer (Applied to all pages) ---
         const pageCount = doc.getNumberOfPages();
         for(let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
-            doc.setFontSize(8);
+            doc.setFont("times", "normal");
+            doc.setFontSize(9);
             doc.setTextColor(150);
+            
+            // Footer Line
+            doc.setDrawColor(220);
+            doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+            
+            // Footer Text
             doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
             doc.text("Portais da Consciência - Fé em 10 Minutos de Oração - youtube.com/@fe10minutos", margin, pageHeight - 10);
         }
