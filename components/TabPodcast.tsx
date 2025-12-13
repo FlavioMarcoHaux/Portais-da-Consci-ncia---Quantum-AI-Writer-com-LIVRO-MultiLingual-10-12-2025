@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Chapter, Subchapter, GenerationStatus, PodcastData, Language, PodcastSegment } from '../types';
+import { Chapter, Subchapter, GenerationStatus, PodcastData, Language, PodcastAudioBlock } from '../types';
 import { QuantumLoader } from './QuantumLoader';
-import { Mic2, Download, Radio, Sparkles, Clock, FileText, Search, Terminal, Archive, Zap, CheckCircle, Loader2, Play, Pause } from 'lucide-react';
-import { generatePodcastScript, generateSpeech, splitTextSmartly, delay } from '../services/geminiService';
-import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import { generateZipPackage, base64ToBlob, createWavBlob } from '../utils/downloadHelper';
+import { Mic2, Download, Radio, Sparkles, Clock, FileText, Search, Zap, CheckCircle, Loader2 } from 'lucide-react';
+import { generatePodcastScript, generateMultiSpeakerSpeech, delay } from '../services/geminiService';
+import { createWavBlob } from '../utils/downloadHelper';
 import { useTranslation } from '../hooks/useTranslation';
 
 interface TabPodcastProps {
@@ -26,15 +25,7 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
     const [audioStatus, setAudioStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
     const [generationLog, setGenerationLog] = useState<string[]>([]);
     
-    // Player para preview individual (opcional)
-    const { playBase64, isPlaying, stop: stopPlayer } = useAudioPlayer();
-    const [playingSegmentIndex, setPlayingSegmentIndex] = useState<number | null>(null);
-
     const t = useTranslation(language);
-
-    useEffect(() => {
-        return () => stopPlayer();
-    }, []);
 
     const addLog = (msg: string) => setGenerationLog(prev => [...prev, `> ${msg}`]);
 
@@ -46,9 +37,8 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
         }
 
         setStatus(GenerationStatus.GENERATING);
-        onUpdate({ segments: [] }); 
+        onUpdate({ segments: [], audioBlocks: [] }); 
         setGenerationLog(["> INIT SCRIPT GENERATION..."]);
-        stopPlayer();
 
         try {
             addLog(`Mode: ${isDeep ? "Deep" : "Fast"}`);
@@ -68,7 +58,7 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
 
             addLog(`Generated ${result.length} text segments`);
             
-            onUpdate({ segments: result, isDeep });
+            onUpdate({ segments: result, isDeep, audioBlocks: [] });
             setStatus(GenerationStatus.COMPLETE);
         } catch (e) {
             console.error(e);
@@ -77,90 +67,95 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
         }
     };
 
-    // 2. SINTETIZAR ÁUDIO (BLOCO A BLOCO)
+    // 2. SINTETIZAR ÁUDIO (AGRUPAMENTO INTELIGENTE - 5 MIN BLOCKS)
     const handleSynthesizeAudio = async () => {
         if (data.segments.length === 0) return;
         
         setAudioStatus(GenerationStatus.GENERATING);
-        addLog("INIT AUDIO SYNTHESIS PROTOCOL...");
+        addLog("INIT AUDIO SYNTHESIS PROTOCOL (BLOCK MODE)...");
         
-        // Copia local para manipulação
-        let updatedSegments = [...data.segments];
+        // --- ETAPA DE AGRUPAMENTO (BATCHING) ---
+        const blocks: PodcastAudioBlock[] = [];
+        let currentBlockText = "";
+        let currentWordCount = 0;
+        let blockIndex = 1;
+        const TARGET_WORDS_PER_BLOCK = 750; // ~5 minutos
 
-        for (let i = 0; i < updatedSegments.length; i++) {
-            // Se já tem áudio, pula
-            if (updatedSegments[i].audioBase64) continue;
+        for (let i = 0; i < data.segments.length; i++) {
+            const seg = data.segments[i];
+            // Formatação Exata para Multi-Speaker TTS: "Speaker Name: Text"
+            const line = `${seg.speaker}: ${seg.text}\n`;
+            
+            currentBlockText += line;
+            currentWordCount += seg.text.split(/\s+/).length;
 
-            // Marca como processando na UI
-            updatedSegments[i] = { ...updatedSegments[i], isProcessingAudio: true };
-            onUpdate({ segments: [...updatedSegments] });
+            const isLast = i === data.segments.length - 1;
+
+            // Fecha o bloco se atingiu o limite ou é o último segmento
+            if (currentWordCount >= TARGET_WORDS_PER_BLOCK || isLast) {
+                blocks.push({
+                    id: `block_${blockIndex}`,
+                    label: `Bloco ${blockIndex} (${Math.round(currentWordCount/150)} min)`,
+                    audioBase64: null,
+                    status: GenerationStatus.IDLE,
+                    transcript: currentBlockText
+                });
+                
+                // Reset
+                currentBlockText = "";
+                currentWordCount = 0;
+                blockIndex++;
+            }
+        }
+
+        // Inicializa estado com blocos vazios
+        onUpdate({ audioBlocks: blocks });
+        
+        // --- ETAPA DE GERAÇÃO (TTS MULTI-SPEAKER) ---
+        const updatedBlocks = [...blocks];
+
+        for (let i = 0; i < updatedBlocks.length; i++) {
+            if (updatedBlocks[i].audioBase64) continue; // Pula se já existe
+
+            // Marca processando
+            updatedBlocks[i].status = GenerationStatus.GENERATING;
+            onUpdate({ audioBlocks: [...updatedBlocks] });
+            
+            addLog(`Synthesizing ${updatedBlocks[i].label}...`);
+
+            if (i > 0) await delay(2000); // Rate limit safety
 
             try {
-                addLog(`Synthesizing Block ${i + 1}/${updatedSegments.length} (${updatedSegments[i].speaker})...`);
+                const audio = await generateMultiSpeakerSpeech(updatedBlocks[i].transcript);
                 
-                // Divide se for muito longo (segurança)
-                const chunks = splitTextSmartly(updatedSegments[i].text, 4000);
-                let segmentAudioBase64 = "";
-
-                // Nota: Por simplicidade de UX e API, vamos gerar um único base64 por segmento de roteiro
-                // Se o segmento for gigante, o generateSpeech pode falhar, então o ideal seria iterar chunks, 
-                // mas para "Blocos de 5 min" do prompt anterior, o roteiro já deve vir quebrado.
-                // Se o texto for > 4000 chars, pegamos apenas o primeiro chunk ou iteramos? 
-                // Vamos iterar e concatenar (muito complexo para base64 puro sem header WAV).
-                // Solução Simplificada: Assumimos que o roteiro já vem bem quebrado.
-                
-                // Delay para rate limit
-                if (i > 0) await delay(1500);
-
-                const audioResult = await generateSpeech(updatedSegments[i].text, updatedSegments[i].voiceId);
-                
-                updatedSegments[i] = { 
-                    ...updatedSegments[i], 
-                    audioBase64: audioResult, // Se null, falhou
-                    isProcessingAudio: false 
-                };
-
-            } catch (error) {
-                console.error(`Error segment ${i}`, error);
-                updatedSegments[i] = { ...updatedSegments[i], isProcessingAudio: false };
-                addLog(`Error synthesizing block ${i+1}`);
+                updatedBlocks[i].status = audio ? GenerationStatus.COMPLETE : GenerationStatus.ERROR;
+                updatedBlocks[i].audioBase64 = audio;
+            } catch (err) {
+                console.error(err);
+                updatedBlocks[i].status = GenerationStatus.ERROR;
+                addLog(`Error on Block ${i+1}`);
             }
 
-            // Atualiza estado global a cada passo
-            onUpdate({ segments: [...updatedSegments] });
+            onUpdate({ audioBlocks: [...updatedBlocks] });
         }
 
         setAudioStatus(GenerationStatus.COMPLETE);
-        addLog("AUDIO SYNTHESIS COMPLETE. READY FOR DOWNLOAD.");
+        addLog("AUDIO SYNTHESIS COMPLETE.");
     };
 
-    // 3. PREVIEW INDIVIDUAL
-    const togglePreview = (index: number) => {
-        if (playingSegmentIndex === index && isPlaying) {
-            stopPlayer();
-            setPlayingSegmentIndex(null);
-        } else {
-            const seg = data.segments[index];
-            if (seg.audioBase64) {
-                setPlayingSegmentIndex(index);
-                playBase64(seg.audioBase64, () => setPlayingSegmentIndex(null));
-            }
-        }
-    };
-
-    // 4. DOWNLOAD COMBINADO
+    // 3. DOWNLOAD COMBINADO (Junta os Blocos gerados)
     const handleDownloadMergedAudio = async () => {
-        const segmentsWithAudio = data.segments.filter(s => s.audioBase64);
-        if (segmentsWithAudio.length === 0) return;
+        const blocksWithAudio = data.audioBlocks?.filter(b => b.audioBase64 && b.status === GenerationStatus.COMPLETE) || [];
+        if (blocksWithAudio.length === 0) return;
 
-        addLog("Merging audio blocks...");
+        addLog(`Merging ${blocksWithAudio.length} audio blocks...`);
         
         try {
             const audioBlobs: Blob[] = [];
             
-            for (const seg of segmentsWithAudio) {
-                if (seg.audioBase64) {
-                    const bin = atob(seg.audioBase64);
+            for (const block of blocksWithAudio) {
+                if (block.audioBase64) {
+                    const bin = atob(block.audioBase64);
                     const len = bin.length;
                     const arr = new Uint8Array(len);
                     for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
@@ -185,6 +180,27 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
         }
     };
 
+    // Download de um bloco individual
+    const handleDownloadBlock = (block: PodcastAudioBlock) => {
+         if (!block.audioBase64) return;
+         try {
+            const bin = atob(block.audioBase64);
+            const len = bin.length;
+            const arr = new Uint8Array(len);
+            for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+            const blob = createWavBlob([new Blob([arr])]); // Wrap in wav header
+            
+            if (blob) {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${block.label.replace(/\s/g, '_')}.wav`;
+                document.body.appendChild(a);
+                a.click();
+            }
+         } catch(e) { console.error(e); }
+    };
+
     const getScriptText = () => {
         const title = data.customTopic || subchapter?.title || "podcast";
         const header = `PODCAST SCRIPT (${language.toUpperCase()}): ${title}\n\n`;
@@ -204,7 +220,7 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
         a.click();
     };
 
-    const hasAnyAudio = data.segments.some(s => s.audioBase64);
+    const hasAnyAudio = data.audioBlocks?.some(b => b.audioBase64);
     const isProcessing = status === GenerationStatus.GENERATING || audioStatus === GenerationStatus.GENERATING;
 
     return (
@@ -238,25 +254,25 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
                             {/* CONTROLES DE AÇÃO */}
                             {data.segments.length > 0 && (
                                 <>
-                                    {!hasAnyAudio && (
-                                        <button 
-                                            onClick={handleSynthesizeAudio} 
-                                            disabled={isProcessing}
-                                            className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 animate-pulse"
-                                        >
-                                            <Zap size={16} />
-                                            <span>Sintetizar Áudio</span>
-                                        </button>
-                                    )}
+                                    <button 
+                                        onClick={handleSynthesizeAudio} 
+                                        disabled={isProcessing || (hasAnyAudio && audioStatus === GenerationStatus.COMPLETE)}
+                                        className={`px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 transition-all ${
+                                            hasAnyAudio ? 'bg-neutral-800 text-neutral-400' : 'bg-purple-600 hover:bg-purple-500 text-white animate-pulse'
+                                        }`}
+                                    >
+                                        {audioStatus === GenerationStatus.GENERATING ? <Loader2 className="animate-spin" size={16}/> : <Zap size={16} />}
+                                        <span>{hasAnyAudio ? "Áudio Gerado" : "Sintetizar (Blocos)"}</span>
+                                    </button>
 
                                     {hasAnyAudio && (
                                         <button 
                                             onClick={handleDownloadMergedAudio} 
                                             className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2"
-                                            title="Baixar Áudio Completo"
+                                            title="Baixar Áudio Completo (Unificado)"
                                         >
                                             <Download size={16} />
-                                            <span>Download WAV</span>
+                                            <span>Download Full</span>
                                         </button>
                                     )}
 
@@ -315,49 +331,54 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
                         </div>
                     )}
 
-                    {/* Lista de Segmentos */}
-                    {data.segments.length > 0 && (
-                        <div className="space-y-4 pb-8">
-                            {/* System Log Compacto */}
-                            {isProcessing && (
-                                <div className="bg-black border border-neutral-800 rounded-lg p-3 font-mono text-[10px] text-green-400 h-24 overflow-y-auto mb-4 opacity-80">
-                                    {generationLog.map((log, i) => <div key={i}>{log}</div>)}
-                                    <div id="log-end"></div>
-                                </div>
-                            )}
-
-                            {data.segments.map((seg, idx) => (
-                                <div key={idx} className={`p-5 rounded-xl border transition-all ${seg.isProcessingAudio ? 'border-yellow-500 bg-yellow-900/10' : seg.audioBase64 ? 'border-green-900 bg-green-900/10' : 'bg-[#0f0f0f] border-neutral-700'}`}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-3">
-                                            <span className={`text-xs uppercase font-extrabold ${seg.speaker.includes('Milton') ? 'text-cyan-300' : 'text-pink-300'}`}>
-                                                {seg.speaker}
-                                            </span>
-                                            {/* Status Badge */}
-                                            {seg.isProcessingAudio && (
-                                                <span className="flex items-center gap-1 text-[10px] text-yellow-400 font-bold bg-yellow-900/30 px-2 py-0.5 rounded-full">
-                                                    <Loader2 size={10} className="animate-spin" /> Sintetizando...
-                                                </span>
-                                            )}
-                                            {seg.audioBase64 && (
-                                                <span className="flex items-center gap-1 text-[10px] text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded-full">
-                                                    <CheckCircle size={10} /> Áudio Pronto
-                                                </span>
-                                            )}
-                                        </div>
-                                        
-                                        {/* Play Preview Button */}
-                                        {seg.audioBase64 && (
+                    {/* BLOCKS DISPLAY (NOVA SEÇÃO) */}
+                    {data.audioBlocks && data.audioBlocks.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 border-b border-neutral-800 pb-8">
+                             {data.audioBlocks.map((block) => (
+                                 <div key={block.id} className={`p-4 rounded-xl border flex items-center justify-between ${block.status === GenerationStatus.GENERATING ? 'bg-yellow-900/10 border-yellow-600/50' : block.status === GenerationStatus.COMPLETE ? 'bg-green-900/10 border-green-600/50' : 'bg-neutral-900/50 border-neutral-800'}`}>
+                                     <div>
+                                         <p className="text-white font-bold text-sm">{block.label}</p>
+                                         <p className="text-[10px] text-neutral-400 uppercase font-mono mt-1">
+                                             {block.status === GenerationStatus.GENERATING ? "Processando..." : block.status === GenerationStatus.COMPLETE ? "Pronto para Download" : "Aguardando..."}
+                                         </p>
+                                     </div>
+                                     <div>
+                                        {block.status === GenerationStatus.GENERATING && <Loader2 className="animate-spin text-yellow-500" size={20} />}
+                                        {block.status === GenerationStatus.COMPLETE && (
                                             <button 
-                                                onClick={() => togglePreview(idx)}
-                                                className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-300 transition-colors"
-                                                title="Preview deste bloco"
+                                                onClick={() => handleDownloadBlock(block)}
+                                                className="bg-neutral-800 hover:bg-neutral-700 text-green-400 p-2 rounded-full transition-colors"
+                                                title="Baixar Bloco Individual"
                                             >
-                                                {playingSegmentIndex === idx && isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                                                <Download size={16} />
                                             </button>
                                         )}
+                                     </div>
+                                 </div>
+                             ))}
+                        </div>
+                    )}
+
+                    {/* System Log */}
+                    {isProcessing && (
+                        <div className="bg-black border border-neutral-800 rounded-lg p-3 font-mono text-[10px] text-green-400 h-24 overflow-y-auto mb-4 opacity-80">
+                            {generationLog.map((log, i) => <div key={i}>{log}</div>)}
+                            <div id="log-end"></div>
+                        </div>
+                    )}
+
+                    {/* Lista de Segmentos (Visualização Apenas) */}
+                    {data.segments.length > 0 && (
+                        <div className="space-y-4 pb-8 opacity-80">
+                            <h3 className="text-xs uppercase font-bold text-neutral-500 tracking-widest mb-2">Script Preview</h3>
+                            {data.segments.map((seg, idx) => (
+                                <div key={idx} className="p-4 rounded-xl border border-neutral-800 bg-[#0f0f0f]">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className={`text-xs uppercase font-extrabold ${seg.speaker.includes('Milton') ? 'text-cyan-300' : 'text-pink-300'}`}>
+                                            {seg.speaker}
+                                        </span>
                                     </div>
-                                    <p className="text-base font-display leading-relaxed text-neutral-300">{seg.text}</p>
+                                    <p className="text-sm font-display leading-relaxed text-neutral-400">{seg.text}</p>
                                 </div>
                             ))}
                         </div>

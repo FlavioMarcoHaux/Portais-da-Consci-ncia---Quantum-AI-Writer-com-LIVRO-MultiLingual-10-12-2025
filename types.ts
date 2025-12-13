@@ -36,14 +36,21 @@ export interface ChatMessage {
   id: string;
 }
 
-// Novo tipo para o roteiro do Podcast
+// Roteiro de Texto (Visualização)
 export interface PodcastSegment {
   speaker: string; // "Milton Dilts" or "Roberta Erickson"
   voiceId: string; // "Enceladus" or "Aoede"
   text: string;
   tone?: string;
-  audioBase64?: string | null; // Armazena o áudio gerado deste bloco
-  isProcessingAudio?: boolean; // Indica se este bloco específico está sendo sintetizado
+}
+
+// Novo: Bloco de Áudio Consolidado (5 min)
+export interface PodcastAudioBlock {
+  id: string;
+  label: string; // "Bloco 1 (0-5 min)"
+  audioBase64: string | null;
+  status: GenerationStatus;
+  transcript: string; // O texto consolidado deste bloco
 }
 
 export interface MarketingStrategy {
@@ -64,6 +71,7 @@ export interface MarketingData {
 
 export interface PodcastData {
   segments: PodcastSegment[];
+  audioBlocks: PodcastAudioBlock[]; // Blocos de áudio gerados
   durationMinutes: number;
   customTopic: string;
   isDeep: boolean;

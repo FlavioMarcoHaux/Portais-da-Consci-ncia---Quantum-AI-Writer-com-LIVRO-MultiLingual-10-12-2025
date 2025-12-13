@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ContentArea } from './components/ContentArea';
@@ -133,7 +134,7 @@ function App() {
   };
 
   const defaultPodcastData: PodcastData = {
-      segments: [], durationMinutes: 5, customTopic: "", isDeep: false
+      segments: [], audioBlocks: [], durationMinutes: 5, customTopic: "", isDeep: false
   };
 
   const defaultWriterData: WriterData = {
@@ -149,6 +150,7 @@ function App() {
   const activeWriterData = { ...defaultWriterData, ...(writerCache[activeCacheKey] || {}) };
 
   if (!activePodcastData.segments) activePodcastData.segments = [];
+  if (!activePodcastData.audioBlocks) activePodcastData.audioBlocks = [];
 
   return (
     <div className="flex h-screen w-full bg-[#050505] overflow-hidden selection:bg-indigo-500/30 relative">

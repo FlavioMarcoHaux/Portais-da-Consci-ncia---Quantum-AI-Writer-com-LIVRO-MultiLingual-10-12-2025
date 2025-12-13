@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { getCorePersonaInstruction, getPodcastSystemInstruction, getSeoAgentInstruction, getThumbnailAgentInstruction } from '../constants';
 import { BIBLIOGRAPHY } from '../bibliography';
@@ -248,6 +249,7 @@ export const generatePodcastScript = async (
     return allSegments;
 }
 
+// Single Speaker (Legacy/Simple)
 export const generateSpeech = async (text: string, voiceIdOrName: string, retries = 3): Promise<string | null> => {
   if (!apiKey) throw new Error("API Key not found.");
   
@@ -256,21 +258,16 @@ export const generateSpeech = async (text: string, voiceIdOrName: string, retrie
   let apiVoiceName = 'Enceladus'; // Default for Milton
   const input = voiceIdOrName ? voiceIdOrName.toLowerCase() : '';
 
-  // 1. Direct API Name Match (Priority) - INCLUDING Enceladus
   if (['puck', 'charon', 'kore', 'fenrir', 'aoede', 'zephyr', 'enceladus'].includes(input)) {
       apiVoiceName = input.charAt(0).toUpperCase() + input.slice(1);
   } 
-  // 2. Persona Mapping (Fallback)
   else {
-      // Roberta Erickson -> Aoede
       if (input.includes('roberta') || input.includes('aoede') || input.includes('erickson')) {
           apiVoiceName = 'Aoede';
       }
-      // Milton Dilts -> Enceladus (User Specific)
       else if (input.includes('milton') || input.includes('dilts') || input.includes('enceladus')) {
           apiVoiceName = 'Enceladus';
       }
-      // General Male -> Enceladus (Safe default for this app)
       else {
           apiVoiceName = 'Enceladus'; 
       }
@@ -295,21 +292,64 @@ export const generateSpeech = async (text: string, voiceIdOrName: string, retrie
         return base64Audio || null;
 
       } catch (error: any) {
-        const isRateLimit = error.message?.includes('429') || error.status === 429 || error.status === 503;
-        const isInternalError = error.message?.includes('500') || error.status === 500;
-        
-        if ((isRateLimit || isInternalError) && attempt < retries - 1) {
-            const waitTime = 2000 * Math.pow(2, attempt); 
-            console.warn(`TTS Error (${error.status || error.code || 'unknown'}). Retrying in ${waitTime}ms... (Attempt ${attempt + 1}/${retries})`);
-            await delay(waitTime);
+        if (attempt < retries - 1) {
+            await delay(2000);
             continue;
         }
-
         console.error("Error generating speech:", error);
         return null;
       }
   }
   return null;
+};
+
+// Multi Speaker (New Optimization)
+export const generateMultiSpeakerSpeech = async (scriptText: string, retries = 3): Promise<string | null> => {
+    if (!apiKey) throw new Error("API Key not found.");
+
+    // Define speakers mapping (Fixed for Milton/Roberta)
+    const speakerConfig = [
+        {
+            speaker: 'Milton Dilts',
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Enceladus' } }
+        },
+        {
+            speaker: 'Roberta Erickson',
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
+        }
+    ];
+
+    for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-tts',
+                contents: [{ parts: [{ text: scriptText }] }],
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: {
+                        multiSpeakerVoiceConfig: {
+                            speakerVoiceConfigs: speakerConfig
+                        }
+                    },
+                },
+            });
+
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            return base64Audio || null;
+
+        } catch (error: any) {
+             const isRateLimit = error.message?.includes('429') || error.status === 429 || error.status === 503;
+             if (isRateLimit && attempt < retries - 1) {
+                const waitTime = 3000 * Math.pow(2, attempt); 
+                console.warn(`TTS (Multi) Error. Retrying in ${waitTime}ms...`);
+                await delay(waitTime);
+                continue;
+             }
+             console.error("Multi-speaker TTS error:", error);
+             return null;
+        }
+    }
+    return null;
 };
 
 export const sendChatMessage = async (
