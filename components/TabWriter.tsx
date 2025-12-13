@@ -4,6 +4,7 @@ import { Chapter, Subchapter, WriterData, Language, GenerationStatus } from '../
 import { BookOpen } from 'lucide-react';
 import { WriterBook } from './WriterBook';
 import { WriterLecture } from './WriterLecture';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface TabWriterProps {
     chapter: Chapter | null;
@@ -16,15 +17,14 @@ interface TabWriterProps {
 export const TabWriter: React.FC<TabWriterProps> = ({ 
     chapter, subchapter, language, data, onUpdate 
 }) => {
-    // Controls which view is active: Book or Lecture
-    // Default to 'book'. Automatically switch to 'lecture' if user wants to generate it.
     const [viewMode, setViewMode] = useState<'book' | 'lecture'>('book');
+    const t = useTranslation(language);
 
     if (!subchapter) {
         return (
             <div className="flex-1 flex items-center justify-center text-neutral-500 flex-col animate-fade-in h-full">
                 <BookOpen size={48} className="mb-4 opacity-30" />
-                <p>Selecione um subcapítulo no menu para iniciar a escrita.</p>
+                <p>{language === 'pt' ? 'Selecione um subcapítulo no menu para iniciar a escrita.' : 'Select a subchapter from the menu to start writing.'}</p>
             </div>
         );
     }
@@ -39,13 +39,13 @@ export const TabWriter: React.FC<TabWriterProps> = ({
                             onClick={() => setViewMode('book')}
                             className={`px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${viewMode === 'book' ? 'bg-indigo-600 text-white shadow-lg' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
                         >
-                            Manuscrito (Milton)
+                            {t.common.modeBook}
                         </button>
                         <button 
                             onClick={() => setViewMode('lecture')}
                             className={`px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${viewMode === 'lecture' ? 'bg-emerald-600 text-white shadow-lg' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
                         >
-                            Aula Magna (Roberta)
+                            {t.common.modeLecture}
                         </button>
                     </div>
                 </div>

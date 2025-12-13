@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Chapter, Subchapter, MarketingData, PodcastData, WriterData, ChatMessage, Language } from '../types';
 import { TabManuscript } from './TabManuscript';
@@ -7,6 +6,7 @@ import { TabPodcast } from './TabPodcast';
 import { TabWriter } from './TabWriter';
 import { TabChat } from './TabChat';
 import { Menu } from 'lucide-react';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ContentAreaProps {
   chapter: Chapter | null;
@@ -23,7 +23,7 @@ interface ContentAreaProps {
   onUpdateWriter: (data: Partial<WriterData>) => void;
   onUpdateChat: (history: ChatMessage[]) => void;
   
-  onToggleSidebar: () => void; // Prop to open sidebar on mobile
+  onToggleSidebar: () => void; 
 }
 
 export const ContentArea: React.FC<ContentAreaProps> = ({ 
@@ -41,6 +41,7 @@ export const ContentArea: React.FC<ContentAreaProps> = ({
   onToggleSidebar
 }) => {
   const [activeTab, setActiveTab] = useState<'writer' | 'marketing' | 'podcast' | 'chat'>('writer');
+  const t = useTranslation(language);
 
   return (
     <div className="flex-1 h-screen overflow-hidden bg-neutral-950 relative flex flex-col w-full">
@@ -61,31 +62,31 @@ export const ContentArea: React.FC<ContentAreaProps> = ({
                 onClick={() => setActiveTab('writer')}
                 className={`pb-4 px-3 text-sm font-bold tracking-wider transition-all border-b-2 hover:bg-neutral-800 rounded-t-lg whitespace-nowrap ${activeTab === 'writer' ? 'border-emerald-500 text-white shadow-[0_4px_20px_-10px_rgba(16,185,129,0.5)]' : 'border-transparent text-neutral-300 hover:text-white'}`}
              >
-                ESCRITOR
+                {t.tabs.writer}
              </button>
              <button 
                 onClick={() => setActiveTab('marketing')}
                 className={`pb-4 px-3 text-sm font-bold tracking-wider transition-all border-b-2 hover:bg-neutral-800 rounded-t-lg whitespace-nowrap ${activeTab === 'marketing' ? 'border-indigo-500 text-white shadow-[0_4px_20px_-10px_rgba(99,102,241,0.5)]' : 'border-transparent text-neutral-300 hover:text-white'}`}
              >
-                MARKETING
+                {t.tabs.marketing}
              </button>
              <button 
                 onClick={() => setActiveTab('podcast')}
                 className={`pb-4 px-3 text-sm font-bold tracking-wider transition-all border-b-2 hover:bg-neutral-800 rounded-t-lg whitespace-nowrap ${activeTab === 'podcast' ? 'border-purple-500 text-white shadow-[0_4px_20px_-10px_rgba(168,85,247,0.5)]' : 'border-transparent text-neutral-300 hover:text-white'}`}
              >
-                PODCAST
+                {t.tabs.podcast}
              </button>
              <button 
                 onClick={() => setActiveTab('chat')}
                 className={`pb-4 px-3 text-sm font-bold tracking-wider transition-all border-b-2 hover:bg-neutral-800 rounded-t-lg whitespace-nowrap ${activeTab === 'chat' ? 'border-cyan-500 text-white shadow-[0_4px_20px_-10px_rgba(6,182,212,0.5)]' : 'border-transparent text-neutral-300 hover:text-white'}`}
              >
-                CHAT
+                {t.tabs.chat}
              </button>
          </div>
          
          {/* Language Indicator */}
          <div className="hidden sm:block ml-auto text-[10px] md:text-xs text-neutral-300 uppercase font-bold tracking-widest border border-neutral-600 bg-neutral-900 px-2 py-1 md:px-3 md:py-1.5 rounded shadow-sm whitespace-nowrap">
-            OUT: <span className="text-white">{language.toUpperCase()}</span>
+            {t.tabs.out}: <span className="text-white">{language.toUpperCase()}</span>
          </div>
       </div>
 

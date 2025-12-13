@@ -9,6 +9,7 @@ import { generateSpeech, splitTextSmartly, delay, cleanMarkdownForSpeech } from 
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { createWavBlob } from '../utils/downloadHelper';
 import { QuantumLoader } from './QuantumLoader';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface WriterBookProps {
     chapter: Chapter | null;
@@ -24,12 +25,13 @@ export const WriterBook: React.FC<WriterBookProps> = ({
 }) => {
     const { playBase64, isPlaying, stop, base64ToUint8Array } = useAudioPlayer();
     const [progressMsg, setProgressMsg] = useState("");
+    const t = useTranslation(language);
 
     // --- LOGIC: BOOK AUDIOBOOK ---
     const handleCreateAudiobook = async () => {
         if (!data.book?.fullText) return;
         onUpdate({ statusAudioBook: GenerationStatus.GENERATING });
-        setProgressMsg("Engenharia de Áudio: Narrando capítulo (Isso pode levar 1-2 minutos)...");
+        setProgressMsg(t.writer.statusAudio);
 
         try {
             const cleanText = cleanMarkdownForSpeech(data.book.fullText);
@@ -38,12 +40,11 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             
             for (let i = 0; i < chunks.length; i++) {
                 const pct = Math.round(((i) / chunks.length) * 100);
-                setProgressMsg(`Renderizando Voz Quântica (Enceladus): ${pct}%`);
+                setProgressMsg(`${t.writer.statusAudio} ${pct}%`);
                 
                 if (i > 0) await delay(1000); 
 
                 try {
-                    // EXPLICIT: Use Enceladus for Milton Dilts (Breathy, lower pitch)
                     const base64 = await generateSpeech(chunks[i], 'Enceladus');
                     if (base64) {
                         const bytes = base64ToUint8Array(base64);
@@ -53,8 +54,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                     console.error("Chunk failed", e);
                 }
             }
-            setProgressMsg("Finalizando Áudio...");
-
+            
             const wavBlob = createWavBlob(audioBlobs);
             if (wavBlob) {
                 const url = window.URL.createObjectURL(wavBlob);
@@ -77,17 +77,17 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         if (!content || !subchapter) return;
 
         const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth(); // ~210mm (A4)
-        const pageHeight = doc.internal.pageSize.getHeight(); // ~297mm (A4)
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 20;
-        const bottomMargin = 35; // Increased buffer for footer
+        const bottomMargin = 35;
         const maxLineWidth = pageWidth - (margin * 2);
         
         let y = margin + 10;
 
         // --- Cover / Header ---
         doc.setFont("times", "bold");
-        doc.setFontSize(24); // Larger Title
+        doc.setFontSize(24); 
         doc.setTextColor(0, 0, 0);
         
         const splitTitle = doc.splitTextToSize(subchapter.title, maxLineWidth);
@@ -97,7 +97,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         doc.setFont("times", "normal");
         doc.setFontSize(12);
         doc.setTextColor(80);
-        doc.text("Manuscrito Original - Portais da Consciência", margin, y);
+        doc.text(`${t.writer.manuscriptHeader} - Portais da Consciência`, margin, y);
         y += 10;
         
         doc.setDrawColor(200);
@@ -109,30 +109,27 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         const lines = content.split('\n');
         
         lines.forEach((line) => {
-            // Check for new page BEFORE writing
-            // pageHeight - bottomMargin ensures text doesn't hit the footer area
             if (y > pageHeight - bottomMargin) {
                 doc.addPage();
-                y = margin + 10; // Reset Y for new page
+                y = margin + 10; 
             }
 
             let text = line.trim();
             if (!text) { 
-                y += 6; // Space for empty lines
+                y += 6; 
                 return; 
             }
 
-            let fontSize = 12; // Base font increased to 12
+            let fontSize = 12; 
             let fontStyle = "normal";
             let color = [0, 0, 0];
-            let lineHeightFactor = 6; // Approx 1.5 spacing for size 12
+            let lineHeightFactor = 6; 
             
-            // Markdown Parsing
             if (text.startsWith('## ')) {
                 fontSize = 16; 
                 fontStyle = "bold"; 
                 text = text.replace(/^##\s+/, ''); 
-                y += 8; // Extra space before header
+                y += 8; 
                 lineHeightFactor = 8;
             } else if (text.startsWith('### ')) {
                 fontSize = 14; 
@@ -148,7 +145,6 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                 color = [60, 60, 60];
             }
 
-            // Cleanup
             text = text.replace(/\*\*/g, '').replace(/__/g, '');
             
             doc.setFont("times", fontStyle);
@@ -158,11 +154,9 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             const wrappedText = doc.splitTextToSize(text, maxLineWidth);
             doc.text(wrappedText, margin, y);
             
-            // Increment Y based on number of wrapped lines
             y += (wrappedText.length * lineHeightFactor) + 2; 
         });
 
-        // --- Footer (Applied to all pages) ---
         const pageCount = doc.getNumberOfPages();
         for(let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
@@ -170,16 +164,14 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             doc.setFontSize(9);
             doc.setTextColor(150);
             
-            // Footer Line
             doc.setDrawColor(220);
             doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
             
-            // Footer Text
-            doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
-            doc.text("Portais da Consciência - Fé em 10 Minutos de Oração - youtube.com/@fe10minutos", margin, pageHeight - 10);
+            doc.text(`${t.writer.page} ${i} / ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
+            doc.text("Portais da Consciência - Quantum AI Writer", margin, pageHeight - 10);
         }
 
-        doc.save(`Livro_${subchapter.id}.pdf`);
+        doc.save(`Book_${subchapter.id}_${language}.pdf`);
     };
 
     // --- LOGIC: WRITE BOOK ---
@@ -191,14 +183,14 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             lecture: null,
             statusLecture: GenerationStatus.IDLE
         });
-        setProgressMsg("Iniciando processo de escrita quântica...");
+        setProgressMsg(t.writer.statusGenerating);
 
         try {
             await generateBookContent(
                 chapter?.title || "", subchapter.title, subchapter.description || "", subchapter.id, language,
                 (newChunk, fullTextSoFar) => {
                     onUpdate({ book: { fullText: fullTextSoFar, sections: [], generatedAt: Date.now(), audiobookUrl: null }});
-                    setProgressMsg("Escrevendo... O texto está sendo materializado.");
+                    setProgressMsg(t.writer.statusGenerating);
                 }
             );
             onUpdate({ statusBook: GenerationStatus.COMPLETE });
@@ -208,7 +200,6 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         }
     };
 
-    // --- RENDER ---
     const isBusy = data.statusBook === GenerationStatus.GENERATING || data.statusAudioBook === GenerationStatus.GENERATING;
     const showPlaceholder = !data.book?.fullText && data.statusBook === GenerationStatus.IDLE;
 
@@ -219,9 +210,9 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                 
                 <div className="max-w-4xl mx-auto p-8 text-center border-2 border-dashed border-neutral-800 rounded-xl bg-neutral-900/20">
                     <BookOpen size={48} className="mx-auto text-indigo-500 mb-4 opacity-50" />
-                    <h3 className="text-xl font-serif-title text-white mb-2">O Manuscrito Está em Branco</h3>
+                    <h3 className="text-xl font-serif-title text-white mb-2">{t.writer.placeholderTitle}</h3>
                     <p className="text-neutral-400 mb-6 max-w-md mx-auto">
-                        Inicie o protocolo de escrita para gerar um capítulo profundo com a voz de Milton Dilts.
+                        {t.writer.placeholderText}
                     </p>
                     <button 
                         onClick={handleWriteBook}
@@ -229,7 +220,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                         className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-bold shadow-[0_0_20px_rgba(79,70,229,0.4)] transition-all flex items-center gap-2 mx-auto"
                     >
                         <Sparkles size={18} />
-                        Materializar Capítulo
+                        {t.writer.btnGenerate}
                     </button>
                 </div>
             </div>
@@ -243,10 +234,10 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             {/* HEADER ACTIONS */}
             <div className="sticky top-0 z-20 bg-[#050505]/95 backdrop-blur border-b border-neutral-800 p-4 flex justify-between items-center w-full">
                 <div className="text-indigo-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                    <BookOpen size={14} /> Manuscrito
+                    <BookOpen size={14} /> {t.common.modeBook}
                 </div>
                 <div className="flex gap-2 items-center">
-                    <button onClick={handleDownloadPDF} className="p-2 text-neutral-400 hover:text-white border border-neutral-700 rounded-lg hover:bg-neutral-800 flex items-center gap-1" title="Baixar PDF">
+                    <button onClick={handleDownloadPDF} className="p-2 text-neutral-400 hover:text-white border border-neutral-700 rounded-lg hover:bg-neutral-800 flex items-center gap-1" title={t.writer.btnPdf}>
                         <FileText size={18} />
                     </button>
                     
@@ -255,7 +246,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                             href={data.book.audiobookUrl} 
                             download={`audiobook_${subchapter?.id || 'chapter'}.wav`}
                             className="p-2 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 bg-emerald-950/30 rounded-lg hover:bg-emerald-900/50 transition-colors flex items-center gap-1 font-bold text-xs"
-                            title="Baixar Audiobook (.wav)"
+                            title={t.writer.btnWav}
                         >
                             <Download size={18} /> <span>WAV</span>
                         </a>
@@ -265,7 +256,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                         onClick={handleCreateAudiobook} 
                         disabled={isBusy || !!data.book?.audiobookUrl}
                         className={`p-2 border rounded-lg transition-all ${data.book?.audiobookUrl ? 'text-green-400 border-green-900 bg-green-900/10 cursor-default opacity-50' : 'text-neutral-400 hover:text-indigo-400 border-neutral-700 hover:bg-neutral-800'}`}
-                        title="Gerar Audiobook"
+                        title={t.writer.btnAudiobook}
                     >
                         <Mic size={18} />
                     </button>
@@ -284,8 +275,8 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                                 {isPlaying ? <Pause size={18} /> : <Play size={18} />}
                             </button>
                             <div>
-                                <p className="text-xs font-bold text-indigo-300 uppercase">Audiobook (Milton)</p>
-                                <p className="text-white text-xs">Capítulo Completo</p>
+                                <p className="text-xs font-bold text-indigo-300 uppercase">{t.writer.audioPlayer}</p>
+                                <p className="text-white text-xs">{t.writer.chapterFull}</p>
                             </div>
                         </div>
                     </div>
@@ -317,7 +308,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                             className="bg-emerald-700 hover:bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg flex items-center gap-3 mx-auto"
                         >
                             <GraduationCap size={20} />
-                            Gerar Aula Magna (Prof. Roberta)
+                            {t.writer.btnLecture}
                         </button>
                     </div>
                 )}

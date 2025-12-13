@@ -1,11 +1,11 @@
 
-
 import React, { useState } from 'react';
 import { Chapter, Subchapter, GenerationStatus, MarketingData, Language } from '../types';
 import { QuantumLoader } from './QuantumLoader';
 import { Zap, Copy, Youtube, Image as ImageIcon, Download, Sparkles, RefreshCw, Search, Globe, Archive } from 'lucide-react';
 import { generateMarketingStrategy, generateThumbnailPrompt, generateThumbnailImage } from '../services/geminiService';
 import { generateZipPackage, base64ToBlob } from '../utils/downloadHelper';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface TabManuscriptProps {
     chapter: Chapter | null;
@@ -22,10 +22,10 @@ export const TabManuscript: React.FC<TabManuscriptProps> = ({
     data,
     onUpdate
 }) => {
-    // Local loading states (UI only, data is in props)
     const [seoStatus, setSeoStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
     const [visualStatus, setVisualStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
     const [isZipping, setIsZipping] = useState(false);
+    const t = useTranslation(language);
 
     const handleGenerateSEO = async () => {
         if (!subchapter && !data.customTopic) {
@@ -39,11 +39,10 @@ export const TabManuscript: React.FC<TabManuscriptProps> = ({
                 subchapter?.title || "Pesquisa Livre", 
                 subchapter?.description || "Conteúdo baseado em pesquisa web deep research",
                 language,
-                data.customTopic, // Pass custom topic
-                subchapter?.id // Pass subchapter ID for bibliography
+                data.customTopic, 
+                subchapter?.id 
             );
             
-            // Generate prompt automatically based on new strategy
             let newPrompt = data.imagePrompt;
             try {
                 newPrompt = await generateThumbnailPrompt(
@@ -101,37 +100,35 @@ export const TabManuscript: React.FC<TabManuscriptProps> = ({
 
         const safeTitle = (data.strategy.optimizedTitle || "marketing_kit").replace(/[^a-z0-9]/gi, '_').toLowerCase();
         
-        // 1. Prepare Markdown Content
         const contentMd = `
 # ${data.strategy.optimizedTitle}
 
-## Gancho Viral (Hook)
+## Hook
 ${data.strategy.viralHook}
 
-## Descrição Otimizada
+## Description
 ${data.strategy.description}
 
-## Capítulos (Timestamps)
+## Chapters
 ${data.strategy.chapters}
 
 ## Tags
 ${data.strategy.tags}
 
-## Prompt da Thumbnail
+## Thumbnail Prompt
 ${data.imagePrompt}
 `;
 
         const files: { name: string; data: string | Blob }[] = [
-            { name: 'estrategia_seo.md', data: contentMd }
+            { name: 'seo_strategy.md', data: contentMd }
         ];
 
-        // 2. Add Image if available
         if (data.generatedImage) {
             const imgBlob = base64ToBlob(data.generatedImage, 'image/jpeg');
             files.push({ name: 'thumbnail.jpg', data: imgBlob });
         }
 
-        await generateZipPackage(`kit_marketing_${language}_${safeTitle}.zip`, files);
+        await generateZipPackage(`marketing_kit_${language}_${safeTitle}.zip`, files);
         setIsZipping(false);
     };
 
@@ -145,17 +142,15 @@ ${data.imagePrompt}
             <div className="flex-1 border-r border-neutral-700 overflow-y-auto p-6 md:p-8 bg-[#080808]">
                 <div className="flex items-center space-x-2 text-cyan-400 mb-6 uppercase tracking-widest text-xs font-bold border-b border-neutral-700 pb-2">
                     <Youtube size={16} />
-                    <span>Neuro-Marketing Agent ({language.toUpperCase()})</span>
+                    <span>{t.marketing.headerAgent} ({language.toUpperCase()})</span>
                 </div>
 
                 <div className="mb-8">
                     <h1 className="text-2xl font-serif-title text-white mb-2 shadow-black drop-shadow-md">
-                        {subchapter ? subchapter.title : "Marketing & Deep Research"}
+                        {subchapter ? subchapter.title : t.marketing.title}
                     </h1>
                     <p className="text-neutral-300 text-sm mb-4 font-medium">
-                        {subchapter 
-                            ? `Estratégia (${language.toUpperCase()}) baseada no capítulo selecionado.` 
-                            : "Digite um tema abaixo para iniciar uma pesquisa profunda na web."}
+                        {subchapter ? t.marketing.subtitleSub : t.marketing.subtitleFree}
                     </p>
                     
                     {/* Custom Topic Input */}
@@ -165,14 +160,14 @@ ${data.imagePrompt}
                             type="text"
                             value={data.customTopic}
                             onChange={(e) => onUpdate({ customTopic: e.target.value })}
-                            placeholder={subchapter ? "Adicionar Trend Específica..." : "Digite o tema para pesquisar..."}
+                            placeholder={subchapter ? t.marketing.inputTrend : t.marketing.inputPlaceholder}
                             className="w-full bg-[#050505] border border-neutral-600 text-white text-sm rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all placeholder-neutral-500 shadow-inner"
                             disabled={seoStatus === GenerationStatus.GENERATING}
                         />
                         {data.customTopic && (
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] bg-cyan-900 text-cyan-200 px-2 py-0.5 rounded border border-cyan-700 font-bold">
                                 <Globe size={10} />
-                                DEEP RESEARCH
+                                {t.marketing.deepResearchTag}
                             </span>
                         )}
                     </div>
@@ -185,24 +180,22 @@ ${data.imagePrompt}
                          {seoStatus === GenerationStatus.GENERATING ? (
                              <div className="flex items-center gap-2">
                                 <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                                <span className="text-xs animate-pulse font-bold text-cyan-200">ANALISANDO BIG DATA...</span>
+                                <span className="text-xs animate-pulse font-bold text-cyan-200">{t.marketing.statusAnalyze}</span>
                              </div>
                          ) : (
                              <>
                                 <Zap size={20} className="group-hover:text-white transition-colors" />
-                                <span className="font-display tracking-wider font-bold">ATIVAR ESTRATÉGIA VIRAL ({language.toUpperCase()})</span>
+                                <span className="font-display tracking-wider font-bold">{t.marketing.btnAnalyze}</span>
                              </>
                          )}
                     </button>
                 </div>
 
-                {/* VISUAL FEEDBACK: Loader */}
                 {seoStatus === GenerationStatus.GENERATING && <QuantumLoader />}
 
                 {data.strategy && (
                     <div className="space-y-6 animate-fade-in pb-10">
                         
-                        {/* Download ZIP Button */}
                         <button 
                             onClick={handleDownloadZip}
                             disabled={isZipping}
@@ -213,31 +206,28 @@ ${data.imagePrompt}
                             ) : (
                                 <Archive size={18} />
                             )}
-                            <span>Baixar Kit Marketing (.zip)</span>
+                            <span>{t.marketing.btnDownloadKit}</span>
                         </button>
 
-                        {/* Title Block */}
                         <div className="bg-[#0a0a0a] p-5 rounded-lg border border-neutral-600 shadow-lg">
                             <div className="flex justify-between items-center mb-2 border-b border-neutral-700 pb-2">
-                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">Título Otimizado</span>
+                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">{t.marketing.labelTitle}</span>
                                 <button onClick={() => copyToClipboard(data.strategy!.optimizedTitle)} className="text-neutral-500 hover:text-white transition-colors"><Copy size={14} /></button>
                             </div>
                             <p className="text-xl text-white font-bold leading-snug tracking-tight">{data.strategy.optimizedTitle}</p>
                         </div>
 
-                        {/* Viral Hook */}
                         <div className="bg-purple-950/20 p-5 rounded-lg border border-purple-800/50 shadow-[0_4px_20px_-10px_rgba(88,28,135,0.3)]">
                              <div className="flex justify-between items-center mb-2 border-b border-purple-900/30 pb-2">
-                                <span className="text-xs text-purple-300 uppercase font-bold tracking-wider">Gancho Viral</span>
+                                <span className="text-xs text-purple-300 uppercase font-bold tracking-wider">{t.marketing.labelHook}</span>
                                 <button onClick={() => copyToClipboard(data.strategy!.viralHook)} className="text-purple-400 hover:text-white transition-colors"><Copy size={14} /></button>
                             </div>
                             <p className="text-purple-100 italic font-medium text-lg">"{data.strategy.viralHook}"</p>
                         </div>
 
-                        {/* Description & Chapters */}
                         <div className="bg-[#0a0a0a] p-5 rounded-lg border border-neutral-600 shadow-md">
                             <div className="flex justify-between items-center mb-2 border-b border-neutral-700 pb-2">
-                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">Descrição & Timestamps</span>
+                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">{t.marketing.labelDesc}</span>
                                 <button onClick={() => copyToClipboard(data.strategy!.description + "\n\n" + data.strategy!.chapters)} className="text-neutral-500 hover:text-white transition-colors"><Copy size={14} /></button>
                             </div>
                             <div className="h-48 overflow-y-auto pr-2 text-sm text-neutral-200 space-y-4 whitespace-pre-wrap font-mono leading-relaxed bg-[#050505] p-3 rounded border border-neutral-700">
@@ -248,10 +238,9 @@ ${data.imagePrompt}
                             </div>
                         </div>
 
-                        {/* Tags */}
                         <div className="bg-[#0a0a0a] p-5 rounded-lg border border-neutral-600 shadow-md">
                              <div className="flex justify-between items-center mb-2 border-b border-neutral-700 pb-2">
-                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">Tags</span>
+                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">{t.marketing.labelTags}</span>
                                 <button onClick={() => copyToClipboard(data.strategy!.tags)} className="text-neutral-500 hover:text-white transition-colors"><Copy size={14} /></button>
                             </div>
                             <p className="text-xs text-cyan-300 font-mono break-words bg-[#050505] p-3 rounded border border-neutral-700">{data.strategy.tags}</p>
@@ -264,22 +253,22 @@ ${data.imagePrompt}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#050505] border-l border-neutral-700">
                 <div className="flex items-center space-x-2 text-purple-400 mb-6 uppercase tracking-widest text-xs font-bold border-b border-neutral-700 pb-2">
                     <ImageIcon size={16} />
-                    <span>Visual Semiotics Agent (Imagen 4)</span>
+                    <span>{t.marketing.visualAgent}</span>
                 </div>
 
                 {!data.imagePrompt ? (
                     <div className="h-full flex flex-col items-center justify-center text-neutral-500 space-y-4">
                         <ImageIcon size={48} className="opacity-30" />
-                        <p className="text-sm font-medium">Gere a estratégia SEO primeiro para desbloquear o visual.</p>
+                        <p className="text-sm font-medium">{t.marketing.visualPlaceholder}</p>
                     </div>
                 ) : (
                     <div className="space-y-6 animate-fade-in pb-10">
                         {/* Prompt Display */}
                         <div className="bg-[#0a0a0a] p-4 rounded-xl border border-neutral-600 shadow-lg">
                             <div className="flex justify-between items-center mb-3 border-b border-neutral-700 pb-2">
-                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">Prompt de Imagem (Semiótica)</span>
+                                <span className="text-xs text-neutral-400 uppercase font-bold tracking-wider">{t.marketing.labelPrompt}</span>
                                 <div className="flex space-x-2">
-                                    <button onClick={() => handleGeneratePrompt()} title="Regenerar Prompt" className="text-neutral-500 hover:text-white transition-colors"><RefreshCw size={14} /></button>
+                                    <button onClick={() => handleGeneratePrompt()} title="Regenerate" className="text-neutral-500 hover:text-white transition-colors"><RefreshCw size={14} /></button>
                                     <button onClick={() => copyToClipboard(data.imagePrompt)} className="text-neutral-500 hover:text-white transition-colors"><Copy size={14} /></button>
                                 </div>
                             </div>
@@ -290,7 +279,6 @@ ${data.imagePrompt}
                             />
                         </div>
 
-                        {/* Generation Action */}
                         <button
                             onClick={handleGenerateImage}
                             disabled={visualStatus === GenerationStatus.GENERATING}
@@ -299,17 +287,16 @@ ${data.imagePrompt}
                             {visualStatus === GenerationStatus.GENERATING ? (
                                 <div className="flex items-center gap-2">
                                     <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-xs animate-pulse font-bold">RENDERIZANDO EM 8K...</span>
+                                    <span className="text-xs animate-pulse font-bold">{t.marketing.statusRender}</span>
                                 </div>
                             ) : (
                                 <>
                                     <Sparkles size={20} className="group-hover:text-white transition-colors" />
-                                    <span className="font-display tracking-wider font-bold">MATERIALIZAR THUMBNAIL (IMAGEN 4)</span>
+                                    <span className="font-display tracking-wider font-bold">{t.marketing.btnRender}</span>
                                 </>
                             )}
                         </button>
 
-                        {/* Image Result */}
                         {data.generatedImage ? (
                             <div className="relative group rounded-xl overflow-hidden border-2 border-neutral-700 shadow-[0_0_30px_rgba(0,0,0,0.8)]">
                                 <img 
@@ -324,14 +311,14 @@ ${data.imagePrompt}
                                         className="bg-white text-black px-6 py-3 rounded-full flex items-center space-x-2 font-bold hover:scale-105 transition-transform shadow-xl"
                                     >
                                         <Download size={20} />
-                                        <span>Baixar Imagem</span>
+                                        <span>{t.marketing.btnDownloadImg}</span>
                                     </a>
                                 </div>
                             </div>
                         ) : (
                             <div className="aspect-video bg-[#0a0a0a] border-2 border-dashed border-neutral-700 rounded-xl flex flex-col items-center justify-center text-neutral-600">
                                 <ImageIcon size={32} className="mb-2 opacity-50" />
-                                <span className="text-xs uppercase tracking-widest font-bold">Área de Materialização</span>
+                                <span className="text-xs uppercase tracking-widest font-bold">{t.marketing.areaPlaceholder}</span>
                             </div>
                         )}
                     </div>

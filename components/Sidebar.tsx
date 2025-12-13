@@ -2,6 +2,7 @@
 import React from 'react';
 import { BookStructure, Chapter, Subchapter, Language } from '../types';
 import { Book, ChevronRight, Circle, X } from 'lucide-react';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface SidebarProps {
   book: BookStructure;
@@ -9,8 +10,8 @@ interface SidebarProps {
   onSelectSubchapter: (chapter: Chapter, subchapter: Subchapter) => void;
   currentLanguage: Language;
   onSetLanguage: (lang: Language) => void;
-  isOpen: boolean; // New prop for mobile state
-  onClose: () => void; // New prop for closing on mobile
+  isOpen: boolean; 
+  onClose: () => void; 
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -22,6 +23,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     isOpen,
     onClose
 }) => {
+  const t = useTranslation(currentLanguage);
+
   return (
     <div className={`
         fixed inset-y-0 left-0 z-40 w-80 bg-[#020202] border-r border-neutral-700 h-screen overflow-y-auto 
@@ -33,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         
         {/* Mobile Header with Close Button */}
         <div className="flex justify-between items-start mb-4 md:hidden">
-            <span className="text-neutral-400 text-xs font-bold uppercase tracking-widest">Menu Principal</span>
+            <span className="text-neutral-400 text-xs font-bold uppercase tracking-widest">{t.sidebar.menu}</span>
             <button onClick={onClose} className="text-neutral-400 hover:text-white p-1 rounded-md border border-neutral-700 hover:bg-neutral-800">
                 <X size={20} />
             </button>
@@ -63,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="flex items-center space-x-2 text-indigo-400 mb-2">
           <Book size={20} />
-          <span className="font-bold tracking-wider text-xs uppercase text-indigo-300">Estrutura do Livro</span>
+          <span className="font-bold tracking-wider text-xs uppercase text-indigo-300">{t.sidebar.title}</span>
         </div>
         <h1 className="font-serif-title text-xl text-white leading-tight shadow-black drop-shadow-md">{book.title}</h1>
       </div>

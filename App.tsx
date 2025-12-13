@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ContentArea } from './components/ContentArea';
-import { BOOK_STRUCTURE } from './bookStructure';
+import { getBookStructure } from './bookStructure';
 import { Chapter, Subchapter, MarketingData, PodcastData, WriterData, ChatMessage, Language, GenerationStatus } from './types';
 
 function App() {
@@ -12,6 +13,9 @@ function App() {
   // Mobile Sidebar State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // Dynamic Book Structure based on Language
+  const bookStructure = getBookStructure(language);
+
   // ------------------------------------------------------------------
   // GLOBAL STATE MANAGEMENT (Data Persistence)
   // ------------------------------------------------------------------
@@ -32,7 +36,7 @@ function App() {
     } catch (e) { return {}; }
   });
 
-  // 3. Writer Cache (New)
+  // 3. Writer Cache
   const [writerCache, setWriterCache] = useState<Record<string, WriterData>>(() => {
     try {
         const saved = localStorage.getItem('quantum_writer_cache');
@@ -71,6 +75,19 @@ function App() {
   // ------------------------------------------------------------------
   // HANDLERS
   // ------------------------------------------------------------------
+  
+  // Update current selection names when language changes (if selected)
+  useEffect(() => {
+      if (currentSubchapter && currentChapter) {
+          const newChap = bookStructure.chapters.find(c => c.id === currentChapter.id);
+          const newSub = newChap?.subchapters.find(s => s.id === currentSubchapter.id);
+          if (newChap && newSub) {
+              setCurrentChapter(newChap);
+              setCurrentSubchapter(newSub);
+          }
+      }
+  }, [language]);
+
   const handleSelectSubchapter = (chapter: Chapter, subchapter: Subchapter) => {
     setCurrentChapter(chapter);
     setCurrentSubchapter(subchapter);
@@ -99,7 +116,6 @@ function App() {
   const updateWriterData = (data: Partial<WriterData>) => {
     setWriterCache(prev => {
         const current = (prev[activeCacheKey] || {}) as WriterData;
-        // Merge profundo para book e lecture
         return { 
             ...prev, 
             [activeCacheKey]: { 
@@ -132,13 +148,11 @@ function App() {
   const activePodcastData = { ...defaultPodcastData, ...(podcastCache[activeCacheKey] || {}) };
   const activeWriterData = { ...defaultWriterData, ...(writerCache[activeCacheKey] || {}) };
 
-  // Ensure Arrays
   if (!activePodcastData.segments) activePodcastData.segments = [];
 
   return (
     <div className="flex h-screen w-full bg-[#050505] overflow-hidden selection:bg-indigo-500/30 relative">
       
-      {/* Mobile Overlay Backdrop */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/80 z-30 md:hidden backdrop-blur-sm transition-opacity"
@@ -147,7 +161,7 @@ function App() {
       )}
 
       <Sidebar 
-        book={BOOK_STRUCTURE} 
+        book={bookStructure} 
         currentSubchapter={currentSubchapter}
         onSelectSubchapter={handleSelectSubchapter}
         currentLanguage={language}
@@ -161,19 +175,16 @@ function App() {
         subchapter={currentSubchapter}
         language={language}
         
-        // Data
         marketingData={activeMarketingData}
         podcastData={activePodcastData}
         writerData={activeWriterData}
         chatHistory={chatHistory}
         
-        // Updaters
         onUpdateMarketing={updateMarketingData}
         onUpdatePodcast={updatePodcastData}
         onUpdateWriter={updateWriterData}
         onUpdateChat={setChatHistory}
 
-        // UX Controls
         onToggleSidebar={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       />
     </div>

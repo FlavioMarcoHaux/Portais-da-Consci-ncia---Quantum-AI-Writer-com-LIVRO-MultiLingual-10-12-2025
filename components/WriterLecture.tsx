@@ -9,6 +9,7 @@ import { generateSpeech, splitTextSmartly, delay, cleanMarkdownForSpeech } from 
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { createWavBlob } from '../utils/downloadHelper';
 import { QuantumLoader } from './QuantumLoader';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface WriterLectureProps {
     subchapter: Subchapter | null;
@@ -22,6 +23,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
 }) => {
     const { playBase64, isPlaying, stop, base64ToUint8Array } = useAudioPlayer();
     const [progressMsg, setProgressMsg] = useState("");
+    const t = useTranslation(language);
 
     // --- LOGIC: LECTURE AUDIO ---
     const handleCreateAudioLecture = async () => {
@@ -30,20 +32,17 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
         setProgressMsg("Engenharia de Áudio: Gravando Aula Magna...");
 
         try {
-            // Clean markdown first (remove tables, bold, etc)
             const cleanText = cleanMarkdownForSpeech(data.lecture.script);
-            // Chunking
             const chunks = splitTextSmartly(cleanText, 2000); 
             const audioBlobs: Blob[] = [];
             
             for (let i = 0; i < chunks.length; i++) {
                 const pct = Math.round(((i) / chunks.length) * 100);
-                setProgressMsg(`Renderizando Voz da Professora (Roberta): ${pct}%`);
+                setProgressMsg(`${t.writer.statusAudio} ${pct}%`);
                 
                 if (i > 0) await delay(1000); 
 
                 try {
-                    // EXPLICIT: Use Aoede for Roberta Erickson
                     const base64 = await generateSpeech(chunks[i], 'Aoede');
                     if (base64) {
                         const bytes = base64ToUint8Array(base64);
@@ -53,12 +52,10 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                     console.error("Chunk failed", e);
                 }
             }
-            setProgressMsg("Finalizando Áudio da Aula...");
-
+            
             const wavBlob = createWavBlob(audioBlobs);
             if (wavBlob) {
                 const url = window.URL.createObjectURL(wavBlob);
-                // Critical update to ensure UI re-renders with the URL without overwriting script
                 onUpdate({ 
                     statusAudioLecture: GenerationStatus.COMPLETE,
                     lecture: { ...data.lecture, audioUrl: url }
@@ -103,20 +100,20 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 20;
-        const bottomMargin = 35; // Increased buffer
+        const bottomMargin = 35; 
         const maxLineWidth = pageWidth - (margin * 2);
         let y = margin + 10;
 
         doc.setFont("times", "bold");
-        doc.setFontSize(22); // Increased title
+        doc.setFontSize(22); 
         doc.setTextColor(10, 80, 60);
-        doc.text(`Aula Magna: ${subchapter.title}`, margin, y);
+        doc.text(`${t.lecture.header}: ${subchapter.title}`, margin, y);
         y += 15;
 
         doc.setFont("times", "normal");
         doc.setFontSize(12);
         doc.setTextColor(100);
-        doc.text("Guia de Estudos & Práticas - Prof. Roberta Erickson", margin, y);
+        doc.text("Prof. Roberta Erickson", margin, y);
         y += 10;
         doc.setDrawColor(200);
         doc.line(margin, y, pageWidth - margin, y);
@@ -125,7 +122,6 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
         const lines = content.split('\n');
         
         lines.forEach((line) => {
-            // Check for bottom margin collision
             if (y > pageHeight - bottomMargin) { 
                 doc.addPage(); 
                 y = margin + 10; 
@@ -137,7 +133,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                 return; 
             }
 
-            let fontSize = 12; // Increased base font
+            let fontSize = 12; 
             let fontStyle = "normal";
             let color = [0, 0, 0];
             let lineHeightFactor = 6;
@@ -174,21 +170,18 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
             y += (wrappedText.length * lineHeightFactor) + 2;
         });
 
-        // Footer
         const pageCount = doc.getNumberOfPages();
         for(let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
             doc.setFontSize(9);
             doc.setTextColor(150);
-            
             doc.setDrawColor(220);
             doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
-
-            doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
-            doc.text("Guia de Estudos - Fé em 10 Minutos de Oração - youtube.com/@fe10minutos", margin, pageHeight - 10);
+            doc.text(`${t.writer.page} ${i} / ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
+            doc.text(t.lecture.footer, margin, pageHeight - 10);
         }
 
-        doc.save(`Aula_${subchapter.id}.pdf`);
+        doc.save(`Lecture_${subchapter.id}_${language}.pdf`);
     };
 
     const isBusy = data.statusLecture === GenerationStatus.GENERATING || data.statusAudioLecture === GenerationStatus.GENERATING;
@@ -198,9 +191,9 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
             <div className="max-w-5xl mx-auto px-4 py-12 animate-fade-in">
                 <div className="bg-[#0a0a0a] border border-neutral-800 p-12 rounded-2xl flex flex-col items-center text-center gap-6 shadow-xl">
                     <GraduationCap size={48} className="text-emerald-500 mb-2"/>
-                    <h3 className="text-2xl font-display font-bold text-white">Sala de Aula: Profundidade & Prática</h3>
+                    <h3 className="text-2xl font-display font-bold text-white">{t.lecture.placeholderTitle}</h3>
                     <p className="text-neutral-400 text-base leading-relaxed max-w-lg">
-                        Transforme este capítulo em uma <strong>Aula Magna Prática</strong>. A Professora Roberta Erickson irá extrair os conceitos teóricos e criar exercícios de fixação.
+                        {t.lecture.placeholderText}
                     </p>
                     <button 
                         onClick={handleCreateLecture}
@@ -208,7 +201,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                         className="bg-emerald-700 hover:bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg flex items-center gap-3"
                     >
                         <BrainCircuit size={20} />
-                        Gerar Aula Magna
+                        {t.lecture.btnGenerate}
                     </button>
                 </div>
                 {isBusy && <div className="mt-4 flex justify-center"><QuantumLoader/></div>}
@@ -225,7 +218,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                 <div>
                     <h3 className="text-xl font-display font-bold text-white flex items-center gap-2">
                         <GraduationCap className="text-emerald-500" size={24} />
-                        Guia de Estudos (Aula)
+                        {t.lecture.header}
                     </h3>
                 </div>
                 
@@ -239,7 +232,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                             href={data.lecture.audioUrl} 
                             download={`aula_${subchapter?.id || 'gen'}.wav`}
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-950/30 text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 hover:border-emerald-500 hover:bg-emerald-900/50 rounded-lg transition-all text-sm font-medium"
-                            title="Baixar Aula (.wav)"
+                            title={t.writer.btnWav}
                         >
                             <Download size={16} /> <span>WAV</span>
                         </a>
@@ -251,7 +244,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${data.lecture?.audioUrl ? 'text-emerald-400 border-emerald-900 bg-emerald-900/20 cursor-default opacity-50' : 'bg-neutral-900 text-neutral-300 hover:text-white border-neutral-700 hover:border-emerald-500 hover:text-emerald-400'}`}
                     >
                         <Mic size={16} />
-                        {data.lecture?.audioUrl ? 'Áudio Gerado' : 'Gerar Áudio'}
+                        {data.lecture?.audioUrl ? 'Áudio Gerado' : t.lecture.btnAudio}
                     </button>
                 </div>
             </div>
@@ -268,8 +261,8 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                                 {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
                             </button>
                             <div>
-                                <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Podcast da Aula</p>
-                                <h4 className="text-white font-bold text-lg">Explicação da Professora</h4>
+                                <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">{t.lecture.audioLabel}</p>
+                                <h4 className="text-white font-bold text-lg">{t.lecture.audioSub}</h4>
                             </div>
                         </div>
                     </div>
@@ -308,7 +301,7 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
                     </div>
 
                     <div className="mt-12 pt-8 border-t border-neutral-300 flex flex-col md:flex-row justify-between items-center text-neutral-500 text-sm font-mono gap-2">
-                        <span className="text-center md:text-left">Guia de Estudos - Fé em 10 Minutos de Oração - youtube.com/@fe10minutos</span>
+                        <span className="text-center md:text-left">{t.lecture.footer} - Fé em 10 Minutos de Oração</span>
                         <span>Prof. Roberta Erickson</span>
                     </div>
                 </div>

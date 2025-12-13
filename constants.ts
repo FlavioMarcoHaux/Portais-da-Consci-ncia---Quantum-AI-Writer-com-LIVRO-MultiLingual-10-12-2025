@@ -7,19 +7,19 @@ const getLangConfig = (lang: Language) => {
     case 'en':
       return {
         name: "English",
-        context: "Explain simply that Kyoshu-Sama is the current spiritual leader of World Messianity and Meishu-Sama (Mokichi Okada) is the founder and philosopher of the movement, known for Johrei and natural farming.",
+        context: "Explain simply that Kyoshu-Sama is the current spiritual leader of World Church of the Messiah and Meishu-Sama (Mokichi Okada) is the founder and philosopher of the movement, known for Johrei and natural farming.",
         tone: "Scientific, Quantum Mindfulness, Self-Realization, NLP Master Practitioner style."
       };
     case 'es':
       return {
         name: "Español",
-        context: "Explica brevemente que Kyoshu-Sama es el actual líder espiritual de la Mesianidad Mundial y Meishu-Sama (Mokichi Okada) es el fundador, conocido por el Johrei y la agricultura natural.",
+        context: "Explica brevemente que Kyoshu-Sama es el actual líder espiritual de la Iglesia Mundial del Mesías y Meishu-Sama (Mokichi Okada) es el fundador, conocido por el Johrei y la agricultura natural.",
         tone: "Espiritualidad Profunda, Realismo Mágico, Conciencia Cósmica, Emotivo."
       };
     default: // pt
       return {
         name: "Português",
-        context: "Contextualize brevemente Kyoshu-Sama (Líder Espiritual) e Meishu-Sama (Fundador/Mokichi Okada) para o público leigo brasileiro entender a profundidade dos ensinamentos.",
+        context: "Contextualize brevemente Kyoshu-Sama (Líder Espiritual da Igreja Mundial do Messias) e Meishu-Sama (Fundador/Mokichi Okada) para o público leigo brasileiro entender a profundidade dos ensinamentos.",
         tone: "Harmonia, Meishu-Sama, PNL, Hipnótico, Acolhedor."
       };
   }

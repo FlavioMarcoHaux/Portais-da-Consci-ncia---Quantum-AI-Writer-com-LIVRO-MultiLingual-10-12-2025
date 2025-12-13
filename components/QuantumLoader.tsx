@@ -1,6 +1,17 @@
-import React from 'react';
 
-export const QuantumLoader: React.FC = () => {
+import React from 'react';
+import { useTranslation } from '../hooks/useTranslation';
+import { Language } from '../types';
+
+// We need to inject language here, but since it's often used inside components 
+// that already have language access, we can rely on a simple context or just default to EN if not provided,
+// BUT since we are updating everything, let's keep it simple: 
+// The loader text is generic. However, to be perfect, it should accept a prop or we read from a global context.
+// Given the architecture, I'll update it to accept language prop optional, or default to PT.
+
+export const QuantumLoader: React.FC<{ language?: Language }> = ({ language = 'pt' }) => {
+  const t = useTranslation(language);
+  
   return (
     <div className="flex flex-col items-center justify-center p-10 space-y-4">
       <div className="relative w-24 h-24">
@@ -12,7 +23,7 @@ export const QuantumLoader: React.FC = () => {
         </div>
       </div>
       <p className="text-cyan-300 font-display tracking-widest text-sm animate-pulse">
-        PROCESSANDO NA MATRIZ QUÂNTICA...
+        {t.loader}
       </p>
     </div>
   );
