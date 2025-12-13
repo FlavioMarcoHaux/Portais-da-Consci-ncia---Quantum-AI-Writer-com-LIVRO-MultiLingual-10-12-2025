@@ -28,7 +28,8 @@ export const TRANSLATIONS = {
       chapterFull: "Capítulo Completo",
       btnLecture: "Gerar Aula Magna (Prof. Roberta)",
       manuscriptHeader: "Manuscrito Original",
-      page: "Página"
+      page: "Página",
+      bookTitle: "Portais da Consciência"
     },
     lecture: {
       placeholderTitle: "Sala de Aula: Profundidade & Prática",
@@ -116,7 +117,8 @@ export const TRANSLATIONS = {
       chapterFull: "Full Chapter",
       btnLecture: "Generate Masterclass (Prof. Roberta)",
       manuscriptHeader: "Original Manuscript",
-      page: "Page"
+      page: "Page",
+      bookTitle: "Portals of Consciousness"
     },
     lecture: {
       placeholderTitle: "Classroom: Depth & Practice",
@@ -204,7 +206,8 @@ export const TRANSLATIONS = {
       chapterFull: "Capítulo Completo",
       btnLecture: "Generar Clase Magistral (Prof. Roberta)",
       manuscriptHeader: "Manuscrito Original",
-      page: "Página"
+      page: "Página",
+      bookTitle: "Portales de la Conciencia"
     },
     lecture: {
       placeholderTitle: "Aula: Profundidad y Práctica",
@@ -258,7 +261,7 @@ export const TRANSLATIONS = {
       welcomeTitle: "Canal Directo con el Mesías",
       welcomeText: "Milton Dilts y Roberta Erickson están en línea.",
       inputPlaceholder: "Pregunte algo al campo cuántico...",
-      filePlaceholder: "Comente sobre el archivo...",
+      filePlaceholder: "Comente sobre o arquivo...",
       attachment: "Archivo Adjunto"
     },
     common: {

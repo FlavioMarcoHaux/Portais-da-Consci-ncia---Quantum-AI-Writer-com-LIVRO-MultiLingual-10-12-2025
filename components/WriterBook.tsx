@@ -80,7 +80,10 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 20;
-        const bottomMargin = 35;
+        
+        // Critical Fix: Safe Zone for Footer
+        // Footer is at pageHeight - 10. We stop text at pageHeight - 30 to avoid overlap.
+        const safeBottomY = pageHeight - 30; 
         const maxLineWidth = pageWidth - (margin * 2);
         
         let y = margin + 10;
@@ -90,6 +93,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         doc.setFontSize(24); 
         doc.setTextColor(0, 0, 0);
         
+        // Split title to avoid overflowing width
         const splitTitle = doc.splitTextToSize(subchapter.title, maxLineWidth);
         doc.text(splitTitle, margin, y);
         y += (splitTitle.length * 10) + 5;
@@ -97,7 +101,8 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         doc.setFont("times", "normal");
         doc.setFontSize(12);
         doc.setTextColor(80);
-        doc.text(`${t.writer.manuscriptHeader} - Portais da Consciência`, margin, y);
+        // Correct Localized Book Title
+        doc.text(`${t.writer.manuscriptHeader} - ${t.writer.bookTitle}`, margin, y);
         y += 10;
         
         doc.setDrawColor(200);
@@ -109,7 +114,8 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         const lines = content.split('\n');
         
         lines.forEach((line) => {
-            if (y > pageHeight - bottomMargin) {
+            // Check against Safe Bottom Zone to prevent Footer Overlap
+            if (y > safeBottomY) {
                 doc.addPage();
                 y = margin + 10; 
             }
@@ -152,9 +158,16 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             doc.setTextColor(color[0], color[1], color[2]);
 
             const wrappedText = doc.splitTextToSize(text, maxLineWidth);
-            doc.text(wrappedText, margin, y);
             
-            y += (wrappedText.length * lineHeightFactor) + 2; 
+            // Check if block fits, otherwise push to next page
+            const blockHeight = wrappedText.length * lineHeightFactor;
+            if (y + blockHeight > safeBottomY) {
+                doc.addPage();
+                y = margin + 10;
+            }
+
+            doc.text(wrappedText, margin, y);
+            y += blockHeight + 2; 
         });
 
         const pageCount = doc.getNumberOfPages();
@@ -168,7 +181,8 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
             
             doc.text(`${t.writer.page} ${i} / ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
-            doc.text("Portais da Consciência - Quantum AI Writer", margin, pageHeight - 10);
+            // Correct Localized Footer
+            doc.text(`${t.writer.bookTitle} - Quantum AI Writer`, margin, pageHeight - 10);
         }
 
         doc.save(`Book_${subchapter.id}_${language}.pdf`);
@@ -270,7 +284,7 @@ export const WriterBook: React.FC<WriterBookProps> = ({
                         <div className="flex items-center gap-4">
                             <button 
                                 onClick={() => isPlaying ? stop() : playBase64(data.book!.audiobookUrl!.split(',')[1] || "")} 
-                                className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white hover:bg-indigo-400 shadow-lg"
+                                className="w-10 h-14 rounded-full bg-indigo-500 flex items-center justify-center text-white hover:bg-indigo-400 shadow-lg"
                             >
                                 {isPlaying ? <Pause size={18} /> : <Play size={18} />}
                             </button>
@@ -286,7 +300,8 @@ export const WriterBook: React.FC<WriterBookProps> = ({
             {/* BOOK CONTENT */}
             <div className="max-w-[900px] mx-auto bg-[#0a0a0a] min-h-screen border-x border-neutral-800/50 shadow-2xl my-8 p-8 md:p-16">
                 <div className="text-center mb-12 border-b border-neutral-800 pb-8">
-                    <p className="text-xs text-indigo-400 uppercase tracking-[0.3em] mb-4">Portais da Consciência</p>
+                    {/* UPDATED: Dynamic Book Title */}
+                    <p className="text-xs text-indigo-400 uppercase tracking-[0.3em] mb-4">{t.writer.bookTitle}</p>
                     <h2 className="text-3xl font-serif-title text-white leading-tight mb-4">{subchapter?.title}</h2>
                 </div>
                 <div className="prose prose-invert prose-lg max-w-none font-serif text-neutral-300 leading-loose text-justify">

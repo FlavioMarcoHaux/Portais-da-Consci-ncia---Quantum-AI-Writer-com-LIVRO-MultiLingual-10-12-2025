@@ -100,15 +100,21 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 20;
-        const bottomMargin = 35; 
+        
+        // Critical Fix: Safe Bottom Zone to avoid Footer Overlap
+        const safeBottomY = pageHeight - 30;
         const maxLineWidth = pageWidth - (margin * 2);
         let y = margin + 10;
 
         doc.setFont("times", "bold");
         doc.setFontSize(22); 
         doc.setTextColor(10, 80, 60);
-        doc.text(`${t.lecture.header}: ${subchapter.title}`, margin, y);
-        y += 15;
+        
+        // Fix: Split Title text to fit width so it doesn't run off page
+        const fullTitle = `${t.lecture.header}: ${subchapter.title}`;
+        const titleLines = doc.splitTextToSize(fullTitle, maxLineWidth);
+        doc.text(titleLines, margin, y);
+        y += (titleLines.length * 10) + 5; // Adjust Y based on title height
 
         doc.setFont("times", "normal");
         doc.setFontSize(12);
@@ -122,7 +128,8 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
         const lines = content.split('\n');
         
         lines.forEach((line) => {
-            if (y > pageHeight - bottomMargin) { 
+            // Check Safe Zone
+            if (y > safeBottomY) { 
                 doc.addPage(); 
                 y = margin + 10; 
             }
@@ -165,9 +172,16 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
             doc.setTextColor(color[0], color[1], color[2]);
 
             const wrappedText = doc.splitTextToSize(text, maxLineWidth);
-            doc.text(wrappedText, margin, y);
             
-            y += (wrappedText.length * lineHeightFactor) + 2;
+            // Look-ahead to prevent block from overlapping footer
+            const blockHeight = wrappedText.length * lineHeightFactor;
+            if (y + blockHeight > safeBottomY) {
+                doc.addPage();
+                y = margin + 10;
+            }
+
+            doc.text(wrappedText, margin, y);
+            y += blockHeight + 2;
         });
 
         const pageCount = doc.getNumberOfPages();
