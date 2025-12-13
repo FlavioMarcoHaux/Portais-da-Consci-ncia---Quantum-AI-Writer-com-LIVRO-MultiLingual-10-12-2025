@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useTranslation } from '../hooks/useTranslation';
 import { Language } from '../types';
@@ -9,7 +8,7 @@ import { Language } from '../types';
 // The loader text is generic. However, to be perfect, it should accept a prop or we read from a global context.
 // Given the architecture, I'll update it to accept language prop optional, or default to PT.
 
-export const QuantumLoader: React.FC<{ language?: Language }> = ({ language = 'pt' }) => {
+export const QuantumLoader: React.FC<{ language?: Language }> = ({ language = 'pt' as Language }) => {
   const t = useTranslation(language);
   
   return (

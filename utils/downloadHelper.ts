@@ -1,4 +1,5 @@
 
+
 import JSZip from 'jszip';
 
 export const base64ToBlob = (base64: string, type: string) => {
@@ -40,17 +41,22 @@ export const createWavBlob = (audioBlobs: Blob[]): Blob | null => {
         for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
     };
 
+    // RIFF chunk descriptor
     writeString(view, 0, 'RIFF');
     view.setUint32(4, 36 + totalLength, true);
     writeString(view, 8, 'WAVE');
+    
+    // fmt sub-chunk
     writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, 24000, true);
-    view.setUint32(28, 24000 * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
+    view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+    view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+    view.setUint16(22, 1, true); // NumChannels (1 for Mono)
+    view.setUint32(24, 24000, true); // SampleRate (24k)
+    view.setUint32(28, 24000 * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
+    view.setUint16(32, 2, true); // BlockAlign (NumChannels * BitsPerSample/8)
+    view.setUint16(34, 16, true); // BitsPerSample (16 bits)
+
+    // data sub-chunk
     writeString(view, 36, 'data');
     view.setUint32(40, totalLength, true);
 

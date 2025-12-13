@@ -42,6 +42,8 @@ export interface PodcastSegment {
   voiceId: string; // "Enceladus" or "Aoede"
   text: string;
   tone?: string;
+  audioBase64?: string | null; // Armazena o áudio gerado deste bloco
+  isProcessingAudio?: boolean; // Indica se este bloco específico está sendo sintetizado
 }
 
 export interface MarketingStrategy {
