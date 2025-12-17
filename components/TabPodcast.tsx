@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Chapter, Subchapter, GenerationStatus, PodcastData, Language, PodcastAudioBlock } from '../types';
 import { QuantumLoader } from './QuantumLoader';
 import { Mic2, Download, Radio, Sparkles, Clock, FileText, Search, Zap, CheckCircle, Loader2 } from 'lucide-react';
-import { generatePodcastScript, generateMultiSpeakerSpeech, delay } from '../services/geminiService';
+import { generatePodcastScript, generateMultiSpeakerSpeech, delay, cleanMarkdownForSpeech } from '../services/geminiService';
 import { createWavBlob } from '../utils/downloadHelper';
 import { useTranslation } from '../hooks/useTranslation';
 
@@ -83,8 +83,12 @@ export const TabPodcast: React.FC<TabPodcastProps> = ({
 
         for (let i = 0; i < data.segments.length; i++) {
             const seg = data.segments[i];
+            
+            // Clean Text for Audio (Remove Emojis and Markdown) to prevent distortion
+            const cleanText = cleanMarkdownForSpeech(seg.text);
+            
             // Formatação Exata para Multi-Speaker TTS: "Speaker Name: Text"
-            const line = `${seg.speaker}: ${seg.text}\n`;
+            const line = `${seg.speaker}: ${cleanText}\n`;
             
             currentBlockText += line;
             currentWordCount += seg.text.split(/\s+/).length;

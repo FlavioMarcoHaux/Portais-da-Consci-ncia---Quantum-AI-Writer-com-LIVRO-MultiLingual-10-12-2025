@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ContentArea } from './components/ContentArea';
@@ -55,22 +53,38 @@ function App() {
   });
 
   // ------------------------------------------------------------------
-  // PERSISTENCE EFFECTS
+  // SAFE PERSISTENCE LOGIC (Prevents QuotaExceededError Crash)
   // ------------------------------------------------------------------
+  
+  const safeSave = (key: string, data: any) => {
+      try {
+          // Custom replacer to filter out huge Base64 strings to avoid exceeding 5MB LocalStorage limit
+          const json = JSON.stringify(data, (k, v) => {
+              if (typeof v === 'string' && v.length > 50000) { // Limit ~50KB per string field
+                  return null; // Discard heavy audio data from persistence
+              }
+              return v;
+          });
+          localStorage.setItem(key, json);
+      } catch (e) {
+          console.warn(`[Quantum Storage] Quota Exceeded or Error saving ${key}. Heavy data dropped.`);
+      }
+  };
+
   useEffect(() => {
-    localStorage.setItem('quantum_marketing_cache', JSON.stringify(marketingCache));
+    safeSave('quantum_marketing_cache', marketingCache);
   }, [marketingCache]);
 
   useEffect(() => {
-    localStorage.setItem('quantum_podcast_cache', JSON.stringify(podcastCache));
+    safeSave('quantum_podcast_cache', podcastCache);
   }, [podcastCache]);
 
   useEffect(() => {
-    localStorage.setItem('quantum_writer_cache', JSON.stringify(writerCache));
+    safeSave('quantum_writer_cache', writerCache);
   }, [writerCache]);
 
   useEffect(() => {
-    localStorage.setItem('quantum_chat_history', JSON.stringify(chatHistory));
+    safeSave('quantum_chat_history', chatHistory);
   }, [chatHistory]);
 
   // ------------------------------------------------------------------
@@ -149,6 +163,7 @@ function App() {
   const activePodcastData = { ...defaultPodcastData, ...(podcastCache[activeCacheKey] || {}) };
   const activeWriterData = { ...defaultWriterData, ...(writerCache[activeCacheKey] || {}) };
 
+  // Ensure arrays exist
   if (!activePodcastData.segments) activePodcastData.segments = [];
   if (!activePodcastData.audioBlocks) activePodcastData.audioBlocks = [];
 

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Chapter, Subchapter, GenerationStatus, WriterData, Language } from '../types';
 import { BookOpen, Mic, Download, FileText, Play, Pause, Sparkles, GraduationCap } from 'lucide-react';
@@ -34,7 +35,9 @@ export const WriterBook: React.FC<WriterBookProps> = ({
         setProgressMsg(t.writer.statusAudio);
 
         try {
+            // Clean Text deeply to prevent "pipe sound" interference
             const cleanText = cleanMarkdownForSpeech(data.book.fullText);
+            // Chunk size maintained at 2000 as per project requirements
             const chunks = splitTextSmartly(cleanText, 2000); 
             const audioBlobs: Blob[] = [];
             

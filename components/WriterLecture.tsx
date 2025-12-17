@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Subchapter, GenerationStatus, WriterData, Language } from '../types';
 import { GraduationCap, Mic, Download, Play, Pause, FileText, Quote, List, BrainCircuit } from 'lucide-react';
@@ -32,7 +33,9 @@ export const WriterLecture: React.FC<WriterLectureProps> = ({
         setProgressMsg("Engenharia de Áudio: Gravando Aula Magna...");
 
         try {
+            // Clean Text deeply to prevent "pipe sound" interference
             const cleanText = cleanMarkdownForSpeech(data.lecture.script);
+            // Chunk size maintained at 2000 as per project requirements
             const chunks = splitTextSmartly(cleanText, 2000); 
             const audioBlobs: Blob[] = [];
             

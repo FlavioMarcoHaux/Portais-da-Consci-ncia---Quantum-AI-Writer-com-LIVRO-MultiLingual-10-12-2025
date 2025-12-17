@@ -23,16 +23,29 @@ export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, 
 export const cleanMarkdownForSpeech = (markdown: string): string => {
     if (!markdown) return "";
     return markdown
-        .replace(/^\|?[\s\-|:]+\|$/gm, '') 
-        .replace(/\|/g, ', ')
-        .replace(/\*\*|__/g, '')
-        .replace(/^#+\s/gm, '')
-        .replace(/^>\s/gm, '')
+        // Remove Emojis (Faixa Unicode Geral)
+        .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+        // Remove negrito/itálico Markdown (mantém o texto dentro)
+        .replace(/(\*\*|__)(.*?)\1/g, '$2')
+        .replace(/(\*|_)(.*?)\1/g, '$2')
+        // Remove cabeçalhos (#)
+        .replace(/^#+\s+/gm, '')
+        // Remove blockquotes (>)
+        .replace(/^>\s+/gm, '')
+        // Remove code blocks
         .replace(/```[\s\S]*?```/g, '')
-        .replace(/`/g, '')
-        .replace(/!\[(.*?)\]\(.*?\)/g, '$1')
-        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        // Remove links [text](url) -> mantendo apenas text
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        // Remove imagens ![alt](url) -> remove tudo
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+        // Remove marcadores de lista (- , *)
+        .replace(/^[\*\-\+]\s+/gm, '')
+        // Remove caracteres especiais que causam distorção no áudio (MUITO IMPORTANTE PARA EVITAR SOM DE CANO)
+        .replace(/[\*\#\_\[\]\(\)\>\|\~\`]/g, '')
+        // Remove linhas horizontais
         .replace(/^-{3,}$/gm, '')
+        // Normaliza quebras de linha excessivas
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 };
